@@ -1,5 +1,9 @@
 # 变更日志
 
+## 0.2.4
+
+- 每轮结束后在对话里留一行旁注：conversation.chat.turnTail 注册 persona-memory-note，按 turn 的收盘 seq 与复盘记录里的 seq 对应，只在这一轮真的写了记忆时显示「记下 N 条记忆（用户画像 x、角色笔记 y）」；被拒时显示琥珀点。复盘记录新增 seq 字段，新增 GET /turn?session=&after=。
+
 ## 0.2.3
 
 - 未认领池可直接编辑：面板里按用户画像 / 角色笔记分档点「编辑」，内联改完保存；/memory 接口接受 id=default（写 personas/default/），未知角色仍被拒绝。
