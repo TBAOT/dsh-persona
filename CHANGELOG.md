@@ -1,5 +1,11 @@
 # 变更日志
 
+## 0.2.5
+
+- 修复旁注不显示：复盘记录改按 `turn`（`agent/turn-stopping` 的 payload）标记，`seq` 只作兜底（允许落后 1，因为复盘在 turn/end 提交前跑）；客户端改为先查缓存、命中后再按 4/8/12/20/30 秒轮询，最多约 2 分钟 —— 复盘要调模型，首查必然是空的。
+- 客户端按 turn 缓存结果，滚动历史不再对每一轮重复请求。
+- 新增 `/turn` 的单元测试（按 turn 命中、按 seq 容错、缺参 400）。
+
 ## 0.2.4
 
 - 每轮结束后在对话里留一行旁注：conversation.chat.turnTail 注册 persona-memory-note，按 turn 的收盘 seq 与复盘记录里的 seq 对应，只在这一轮真的写了记忆时显示「记下 N 条记忆（用户画像 x、角色笔记 y）」；被拒时显示琥珀点。复盘记录新增 seq 字段，新增 GET /turn?session=&after=。

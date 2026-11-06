@@ -421,6 +421,36 @@ test('the unclaimed bucket is editable through the panel api', async () => {
   })
 })
 
+test('the turn endpoint matches by turn number, and by seq within one step', async () => {
+  await withTempHome(async (home) => {
+    const { ctx, call } = fakeHost()
+    apply(ctx, {})
+    const headers = { 'x-dsh-persona': '1' }
+    await callApi(call, { method: 'POST', url: '/dsh-persona/api/create', headers, body: { name: '甲' } })
+
+    const dir = path.join(home, 'personas', 'slot-1', 'review')
+    await mkdir(dir, { recursive: true })
+    const records = [
+      { at: 't1', sessionId: 's1', persona: 'slot-1', status: 'written', turn: 2, seq: 10, applied: [{ target: 'memory', count: 1 }] },
+      { at: 't2', sessionId: 's1', persona: 'slot-1', status: 'written', turn: 3, seq: 20, applied: [{ target: 'memory', count: 2 }] },
+    ]
+    await writeFile(dir + path.sep + 'log.jsonl', records.map((item) => JSON.stringify(item)).join('\n') + '\n', 'utf8')
+
+    const byTurn = await callApi(call, { url: '/dsh-persona/api/turn?session=s1&turn=3', headers })
+    assert.equal(byTurn.status, 200)
+    assert.equal(byTurn.body.turn.applied[0].count, 2)
+
+    const bySeq = await callApi(call, { url: '/dsh-persona/api/turn?session=s1&after=21', headers })
+    assert.equal(bySeq.body.turn.turn, 3)
+
+    const missing = await callApi(call, { url: '/dsh-persona/api/turn?session=s1&turn=9', headers })
+    assert.equal(missing.body.turn, null)
+
+    const noSession = await callApi(call, { url: '/dsh-persona/api/turn', headers })
+    assert.equal(noSession.status, 400)
+  })
+})
+
 test('memory can be read and written through the panel api', async () => {
   await withTempHome(async (home) => {
     const { ctx, call } = fakeHost()
