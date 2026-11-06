@@ -52,6 +52,9 @@ async function withTempHome(fn) {
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 20))
 
+/** The plugin no longer preloads at creation; keep the call sites harmless. */
+const fireCreated = (host, agent) => (host.listeners.get('agent/created') ?? []).forEach((handler) => handler({ agent }))
+
 test('registers one memory tool and two prompt sections', async () => {
   await withTempHome(async () => {
     const host = fakeHost()
@@ -67,7 +70,7 @@ test('writes entries to the persona directory and reports usage', async () => {
     apply(host.ctx, { personaId: 'tester' })
     const tool = host.tools.get('memory')
     const agent = { id: 'session-1' }
-    host.listeners.get('agent/created').forEach((handler) => handler({ agent }))
+    fireCreated(host, agent)
     await tick()
 
     const result = await tool.execute(
@@ -91,7 +94,7 @@ test('prompt section is empty before the snapshot loads, then renders the block'
     const memorySection = host.sections.get('persona:memory')
 
     assert.equal(userSection.text({ agent }), '')
-    host.listeners.get('agent/created').forEach((handler) => handler({ agent }))
+    fireCreated(host, agent)
     await tick()
     assert.equal(userSection.text({ agent }), '')
     assert.equal(memorySection.text({ agent }), '')
@@ -109,12 +112,12 @@ test('a later session sees what the previous one wrote', async () => {
     apply(host.ctx, { personaId: 'tester' })
     const tool = host.tools.get('memory')
     const first = { id: 'session-a' }
-    host.listeners.get('agent/created').forEach((handler) => handler({ agent: first }))
+    fireCreated(host, first)
     await tick()
     await tool.execute({ target: 'memory', operations: [{ action: 'add', content: '项目用 pnpm' }] }, { agent: first })
 
     const second = { id: 'session-b' }
-    host.listeners.get('agent/created').forEach((handler) => handler({ agent: second }))
+    fireCreated(host, second)
     await tick()
     const block = host.sections.get('persona:memory').text({ agent: second })
     assert.match(block, /长期记忆/)
@@ -128,7 +131,7 @@ test('over-limit write is refused and reports the current entries', async () => 
     apply(host.ctx, { personaId: 'tester', userLimit: 150 })
     const tool = host.tools.get('memory')
     const agent = { id: 'session-c' }
-    host.listeners.get('agent/created').forEach((handler) => handler({ agent }))
+    fireCreated(host, agent)
     await tick()
 
     const result = await tool.execute(
