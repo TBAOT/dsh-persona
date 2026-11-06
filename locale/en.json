@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Persona Memory",
+    "description": "Two-tier long-term memory per persona (user profile + agent notes), frozen at session start."
+  }
+}

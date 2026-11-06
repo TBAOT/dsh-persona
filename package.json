@@ -1,0 +1,60 @@
+{
+  "name": "dsh-persona",
+  "version": "0.2.1",
+  "description": "Multi-persona memory for DeepSeek Harness: two-tier persona memory (user profile + agent notes) with per-turn review. 多个角色各自独立的长期记忆。",
+  "type": "module",
+  "main": "lib/memory.js",
+  "exports": {
+    ".": "./lib/memory.js",
+    "./review": "./lib/review.js",
+    "./roster": "./lib/roster.js",
+    "./skills": "./lib/skills.js",
+    "./client": "./lib/client/panel.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "lib",
+    "locale/*.json",
+    "cordis.patch.yml",
+    "icon.svg",
+    "README.md",
+    "README.en.md",
+    "CHANGELOG.md",
+    "docs",
+    "scripts",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "check": "node scripts/check-patch.mjs",
+    "verify": "node --test && node scripts/check-patch.mjs"
+  },
+  "engines": {
+    "dsh": ">=0.2.1-rc.2 <0.3.0",
+    "node": ">=20.18"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "memory",
+    "persona"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout"
+      ]
+    }
+  },
+  "devDependencies": {
+    "yaml": "^2.9.1"
+  }
+}
