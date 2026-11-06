@@ -388,6 +388,39 @@ test('planAdoption keeps order, drops duplicates and refuses overflow', () => {
   assert.equal(refused.overflow, 53)
 })
 
+test('the unclaimed bucket is editable through the panel api', async () => {
+  await withTempHome(async (home) => {
+    const { ctx, call } = fakeHost()
+    apply(ctx, {})
+    const headers = { 'x-dsh-persona': '1' }
+
+    const saved = await callApi(call, {
+      method: 'POST',
+      url: '/dsh-persona/api/memory',
+      headers,
+      body: { id: 'default', target: 'memory', content: '池子条目一\n\n§\n\n池子条目二' },
+    })
+    assert.equal(saved.status, 200)
+    assert.equal(saved.body.id, 'default')
+
+    const file = path.join(home, 'personas', 'default', 'memory', 'memory.md')
+    assert.deepEqual(parseEntries(await readFile(file, 'utf8')), ['池子条目一', '池子条目二'])
+
+    const read = await callApi(call, { url: '/dsh-persona/api/memory?id=default&target=memory', headers })
+    assert.equal(read.status, 200)
+    assert.equal(read.body.content, '池子条目一\n\n§\n\n池子条目二')
+
+    const refused = await callApi(call, {
+      method: 'POST',
+      url: '/dsh-persona/api/memory',
+      headers,
+      body: { id: 'nobody', target: 'memory', content: 'x' },
+    })
+    assert.equal(refused.status, 400)
+    assert.match(refused.body.error, /没有这个角色/)
+  })
+})
+
 test('memory can be read and written through the panel api', async () => {
   await withTempHome(async (home) => {
     const { ctx, call } = fakeHost()
