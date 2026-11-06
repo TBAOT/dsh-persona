@@ -174,7 +174,9 @@ test('api rejects requests without the gate header', async () => {
 })
 
 test('api creates, lists and resolves personas', async () => {
-  await withTempHome(async () => {
+  await withTempHome(async (home) => {
+    const workspace = path.join(home, 'proj')
+    await mkdir(workspace, { recursive: true })
     const { ctx, call } = fakeHost()
     apply(ctx, {})
     const headers = { 'x-dsh-persona': '1' }
@@ -193,7 +195,7 @@ test('api creates, lists and resolves personas', async () => {
       method: 'POST',
       url: '/dsh-persona/api/bind',
       headers,
-      body: { id, workspace: 'C:\\A\\work\\proj' },
+      body: { id, workspace },
     })
 
     const listed = await callApi(call, { url: '/dsh-persona/api/list', headers })
@@ -203,10 +205,83 @@ test('api creates, lists and resolves personas', async () => {
     assert.match(listed.body.personas[0].skillsDir, /skills$/)
 
     const resolved = await callApi(call, {
-      url: `/dsh-persona/api/resolve?cwd=${encodeURIComponent('C:\\A\\work\\proj\\src')}`,
+      url: `/dsh-persona/api/resolve?cwd=${encodeURIComponent(path.join(workspace, 'src'))}`,
       headers,
     })
     assert.equal(resolved.body.persona.id, id)
+  })
+})
+
+test('binding refuses a path that is not a directory', async () => {
+  await withTempHome(async (home) => {
+    const { ctx, call } = fakeHost()
+    apply(ctx, {})
+    const headers = { 'x-dsh-persona': '1' }
+    await callApi(call, { method: 'POST', url: '/dsh-persona/api/create', headers, body: { name: '甲' } })
+    const refused = await callApi(call, {
+      method: 'POST',
+      url: '/dsh-persona/api/bind',
+      headers,
+      body: { id: 'slot-1', workspace: path.join(home, 'nope') },
+    })
+    assert.equal(refused.status, 400)
+    assert.match(refused.body.error, /目录不存在/)
+  })
+})
+
+test('the app workspace list is offered for binding, with owners marked', async () => {
+  await withTempHome(async (home) => {
+    const alpha = path.join(home, 'alpha')
+    const beta = path.join(home, 'beta')
+    await mkdir(alpha, { recursive: true })
+    await mkdir(beta, { recursive: true })
+    await mkdir(path.join(home, 'storages'), { recursive: true })
+    await writeFile(
+      path.join(home, 'storages', 'workspace.json'),
+      JSON.stringify({
+        unit: { name: 'workspace', version: 2 },
+        global: { initialized: true, workspaceIds: ['w1', 'w2'] },
+        tables: {
+          workspaces: {
+            w1: { path: alpha, title: '甲项目', sessionIds: ['s1', 's2'] },
+            w2: { path: beta, title: '乙项目', sessionIds: [] },
+          },
+        },
+      }),
+      'utf8',
+    )
+
+    const { ctx, call } = fakeHost()
+    apply(ctx, {})
+    const headers = { 'x-dsh-persona': '1' }
+    await callApi(call, { method: 'POST', url: '/dsh-persona/api/create', headers, body: { name: '甲角色' } })
+
+    const before = await callApi(call, { url: '/dsh-persona/api/workspaces', headers })
+    assert.equal(before.status, 200)
+    assert.equal(before.body.source, 'storage')
+    assert.deepEqual(before.body.workspaces.map((item) => item.title), ['甲项目', '乙项目'])
+    assert.equal(before.body.workspaces[0].sessions, 2)
+    assert.equal(before.body.workspaces[0].boundTo, null)
+
+    const bound = await callApi(call, {
+      method: 'POST',
+      url: '/dsh-persona/api/bind',
+      headers,
+      body: { id: 'slot-1', workspaceId: 'w1' },
+    })
+    assert.equal(bound.status, 200)
+
+    const after = await callApi(call, { url: '/dsh-persona/api/workspaces', headers })
+    assert.equal(after.body.workspaces.find((item) => item.id === 'w1').boundTo, 'slot-1')
+    assert.equal(after.body.workspaces.find((item) => item.id === 'w1').boundName, '甲角色')
+
+    const unknown = await callApi(call, {
+      method: 'POST',
+      url: '/dsh-persona/api/bind',
+      headers,
+      body: { id: 'slot-1', workspaceId: 'nope' },
+    })
+    assert.equal(unknown.status, 400)
   })
 })
 
