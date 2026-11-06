@@ -6,8 +6,11 @@ review that records what it learned without being asked.
 
 ## Install
 
+> The name `dsh-persona` on npm belongs to someone else (a placeholder `0.0.1`).
+> This repository is not published to npm — install it from git.
+
 ```sh
-dsh plugin --profile <profile> add dsh-persona
+dsh plugin --profile <profile> add github:TBAOT/dsh-persona
 ```
 
 Then add `dsh-persona` to the profile's bundle list and restart the Harness.

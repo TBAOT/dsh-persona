@@ -8,11 +8,18 @@ character limits and explicit `add` / `patch` / `remove` operations.
 
 ## 安装
 
+> 注意：npm 上的 `dsh-persona` 是**别人占的名字**（同名 `0.0.1`，描述写着 name reserved），
+> 本仓库没有发布到 npm。请从 git 安装。
+
 ```sh
-dsh plugin --profile <profile> add dsh-persona
+# 从仓库装（推荐）
+dsh plugin --profile <profile> add github:TBAOT/dsh-persona
+
+# 或者本地开发：clone 后把链接写进 profile
+dsh plugin --profile <profile> add link:C:/path/to/dsh-persona
 ```
 
-装完后把 `dsh-persona` 加进 profile 的 bundles 列表，重启 Harness。
+装完后把 `dsh-persona` 加进 profile 的 `dsh.profile.bundles` 列表，重启 Harness。
 
 ## 面板（左侧栏「角色」）
 
