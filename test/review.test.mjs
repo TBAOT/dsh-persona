@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
@@ -155,5 +155,27 @@ test('over-limit edits are rejected per target and recorded', async () => {
     assert.match(log, /"rejected"/)
     assert.match(log, /超出上限/)
     assert.match(log, /"status":"rejected"/)
+  })
+})
+
+test('a nearly full memory asks the model to consolidate instead of adding', async () => {
+  await withTempHome(async (home) => {
+    const dir = path.join(home, 'personas', 'tester', 'memory')
+    await mkdir(dir, { recursive: true })
+    await writeFile(
+      path.join(dir, 'memory.md'),
+      `<!-- dsh-persona v1 target=memory -->\n${'x'.repeat(1200)}\n`,
+      'utf8',
+    )
+
+    const host = fakeHost(JSON.stringify({ ops: [] }))
+    apply(host.ctx, { personaId: 'tester', memoryLimit: 1300 })
+    await feedTurn(host)
+    await emit(host.listeners, 'agent/turn-stopping', { agent: { id: 'session-1' }, turn: 1 })
+    await tick()
+
+    const prompt = host.calls[0].messages[1].content[0].text
+    assert.match(prompt, /空间提醒/)
+    assert.match(prompt, /优先用 patch/)
   })
 })
