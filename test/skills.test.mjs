@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
@@ -68,20 +68,29 @@ test('empty list renders nothing', () => {
   assert.equal(renderSkillIndex([]), '')
 })
 
-test('the prompt section is per agent', async () => {
+test('the section resolves the persona from the workspace, without any event', async () => {
   await withTempHome(async (home) => {
-    const dir = path.join(home, 'personas', 'default', 'skills')
+    const dir = path.join(home, 'personas', 'slot-1', 'skills')
     await mkdir(dir, { recursive: true })
-    await writeFile(path.join(dir, 'only-for-default.md'), ['---', 'name: only-for-default', '---'].join('\n'), 'utf8')
+    await writeFile(path.join(dir, 'only-for-slot-1.md'), ['---', 'name: only-for-slot-1', '---'].join('\n'), 'utf8')
+
+    await mkdir(path.join(home, 'personas'), { recursive: true })
+    await writeFile(
+      path.join(home, 'personas', 'index.json'),
+      JSON.stringify({
+        version: 1,
+        personas: [
+          { id: 'slot-1', name: 'A', workspaces: ['C:/proj/a'] },
+          { id: 'slot-2', name: 'B', workspaces: ['C:/proj/b'] },
+        ],
+      }),
+      'utf8',
+    )
 
     const sections = new Map()
-    const listeners = new Map()
     const ctx = {
       logger: { warn() {}, info() {} },
-      on(event, handler) {
-        if (!listeners.has(event)) listeners.set(event, [])
-        listeners.get(event).push(handler)
-      },
+      on() {},
       effect(fn) {
         fn()
         return () => {}
@@ -94,15 +103,12 @@ test('the prompt section is per agent', async () => {
       },
     }
     apply(ctx, {})
-    const agent = { id: 's1', session: { header: { cwd: '' } } }
-    listeners.get('agent/created').forEach((handler) => handler({ agent }))
-    await new Promise((resolve) => setTimeout(resolve, 30))
 
     const section = sections.get('persona:skills')
-    assert.match(section.text({ agent }), /only-for-default/)
-    assert.equal(section.text({ agent: { id: 'other' } }), '')
+    const bound = { id: 's1', session: { header: { cwd: 'C:/proj/a' } } }
+    const other = { id: 's2', session: { header: { cwd: 'C:/proj/b' } } }
 
-    listeners.get('agent/disposed').forEach((handler) => handler({ agent }))
-    assert.equal(section.text({ agent }), '')
+    assert.match(section.text({ agent: bound }), /only-for-slot-1/)
+    assert.equal(section.text({ agent: other }), '')
   })
 })
