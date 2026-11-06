@@ -54,6 +54,15 @@ dsh plugin --profile <profile> add dsh-persona
     model: deepseek-v4.1-flash
 ```
 
+## 没绑角色的工作区
+
+会话的 cwd 不属于任何角色的工作区时，插件回退到配置里的 `personaId`（默认 `default`）：
+记忆照写、复盘照跑，全部落在 `personas/default/`。这个桶不在名册里，所以它不隔离——
+所有未绑定的项目共用一份。面板把它显示成「未认领池」：能看到里面的原文，也能一键并进
+当前角色（`POST /dsh-persona/api/adopt`；与目标条目去重、超上限整批拒绝、成功后池子清空）。
+
+想彻底避免：把工作区绑到角色，或在面板里给这些目录认领一个角色。
+
 ## 私有技能（某角色独有）
 
 把技能放进该角色自己的目录：

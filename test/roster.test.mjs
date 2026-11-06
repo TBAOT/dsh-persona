@@ -8,11 +8,13 @@ import {
   bindWorkspace,
   createPersona,
   deletePersona,
+  planAdoption,
   readIndexFrom,
   resolvePersonaForCwd,
   unbindWorkspace,
   updatePersona,
 } from '../lib/roster.js'
+import { parseEntries } from '../lib/store.js'
 import { SLOT_COUNT } from '../lib/slots.js'
 
 const empty = () => ({ version: 1, personas: [] })
@@ -283,6 +285,107 @@ test('the app workspace list is offered for binding, with owners marked', async 
     })
     assert.equal(unknown.status, 400)
   })
+})
+
+test('beyond the persona limit, adoption is refused without touching either side', async () => {
+  await withTempHome(async (home) => {
+    const { ctx, call } = fakeHost()
+    apply(ctx, {})
+    const headers = { 'x-dsh-persona': '1' }
+    await callApi(call, { method: 'POST', url: '/dsh-persona/api/create', headers, body: { name: '甲' } })
+    await callApi(call, {
+      method: 'POST',
+      url: '/dsh-persona/api/limits',
+      headers,
+      body: { id: 'slot-1', target: 'memory', limit: 200 },
+    })
+    const poolFile = path.join(home, 'personas', 'default', 'memory', 'memory.md')
+    await mkdir(path.dirname(poolFile), { recursive: true })
+    await writeFile(poolFile, `<!-- dsh-persona v1 target=memory -->\n${'长'.repeat(260)}\n`, 'utf8')
+    const targetFile = path.join(home, 'personas', 'slot-1', 'memory', 'memory.md')
+    await mkdir(path.dirname(targetFile), { recursive: true })
+    await writeFile(targetFile, '<!-- dsh-persona v1 target=memory -->\n', 'utf8')
+
+    const refused = await callApi(call, {
+      method: 'POST',
+      url: '/dsh-persona/api/adopt',
+      headers,
+      body: { id: 'slot-1' },
+    })
+    assert.equal(refused.status, 400)
+    assert.equal(refused.body.tier, 'memory')
+    assert.match(refused.body.error, /超出上限/)
+
+    assert.equal(parseEntries(await readFile(poolFile, 'utf8')).length, 1)
+    assert.deepEqual(parseEntries(await readFile(targetFile, 'utf8')), [])
+  })
+})
+
+test('adoption merges the pool into a persona, dedupes, and empties it', async () => {
+  await withTempHome(async (home) => {
+    const { ctx, call } = fakeHost()
+    apply(ctx, {})
+    const headers = { 'x-dsh-persona': '1' }
+    await callApi(call, { method: 'POST', url: '/dsh-persona/api/create', headers, body: { name: '甲' } })
+
+    const poolDir = path.join(home, 'personas', 'default', 'memory')
+    await mkdir(poolDir, { recursive: true })
+    await writeFile(
+      path.join(poolDir, 'memory.md'),
+      '<!-- dsh-persona v1 target=memory -->\n沙箱里的 venv 是 Low 完整性\n§\n旧 venv 在工作区外\n',
+      'utf8',
+    )
+    await writeFile(
+      path.join(poolDir, 'user.md'),
+      '<!-- dsh-persona v1 target=user -->\n用户用中文交流\n',
+      'utf8',
+    )
+
+    const ownDir = path.join(home, 'personas', 'slot-1', 'memory')
+    await mkdir(ownDir, { recursive: true })
+    await writeFile(
+      path.join(ownDir, 'memory.md'),
+      '<!-- dsh-persona v1 target=memory -->\n沙箱里的 venv 是 Low 完整性\n',
+      'utf8',
+    )
+
+    const pool = await callApi(call, { url: '/dsh-persona/api/unclaimed', headers })
+    assert.equal(pool.status, 200)
+    assert.equal(pool.body.empty, false)
+    assert.equal(pool.body.memory.entries.length, 2)
+    assert.equal(pool.body.user.entries.length, 1)
+
+    const adopted = await callApi(call, {
+      method: 'POST',
+      url: '/dsh-persona/api/adopt',
+      headers,
+      body: { id: 'slot-1' },
+    })
+    assert.equal(adopted.status, 200)
+    assert.deepEqual(adopted.body.added, { user: 1, memory: 1 })
+
+    assert.deepEqual(parseEntries(await readFile(path.join(ownDir, 'memory.md'), 'utf8')), [
+      '沙箱里的 venv 是 Low 完整性',
+      '旧 venv 在工作区外',
+    ])
+    assert.deepEqual(parseEntries(await readFile(path.join(ownDir, 'user.md'), 'utf8')), ['用户用中文交流'])
+
+    const after = await callApi(call, { url: '/dsh-persona/api/unclaimed', headers })
+    assert.equal(after.body.empty, true)
+    assert.deepEqual(parseEntries(await readFile(path.join(poolDir, 'memory.md'), 'utf8')), [])
+  })
+})
+
+test('planAdoption keeps order, drops duplicates and refuses overflow', () => {
+  const merged = planAdoption(['a', 'b'], ['b', 'c', 'a', '  '], 1000)
+  assert.equal(merged.ok, true)
+  assert.deepEqual(merged.entries, ['a', 'b', 'c'])
+  assert.equal(merged.added, 1)
+
+  const refused = planAdoption(['x'.repeat(150)], ['y'.repeat(100)], 200)
+  assert.equal(refused.ok, false)
+  assert.match(refused.error, /超出上限/)
+  assert.equal(refused.overflow, 53)
 })
 
 test('memory can be read and written through the panel api', async () => {
