@@ -1,5 +1,7 @@
 # dsh-persona
 
+[![verify](https://github.com/TBAOT/dsh-persona/actions/workflows/verify.yml/badge.svg)](https://github.com/TBAOT/dsh-persona/actions/workflows/verify.yml)
+
 给 DeepSeek Harness 加"角色记忆"：每个角色两档长期记忆，会话开始时冻结注入，写满会拒绝并要求合并。
 
 A persona-memory plugin for DeepSeek Harness. Two tiers (`user` profile and the

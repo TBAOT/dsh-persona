@@ -1,5 +1,7 @@
 # dsh-persona
 
+[![verify](https://github.com/TBAOT/dsh-persona/actions/workflows/verify.yml/badge.svg)](https://github.com/TBAOT/dsh-persona/actions/workflows/verify.yml)
+
 Long-term memory for DeepSeek Harness, organised the way Hermes does it: two
 tiers per persona, frozen into the prompt at session start, plus a per-turn
 review that records what it learned without being asked.
