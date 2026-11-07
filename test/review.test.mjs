@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import { apply } from '../lib/review.js'
+import { apply, LOG_ROTATE_BYTES, needsRotation } from '../lib/review.js'
 
 function fakeHost(responseText) {
   const listeners = new Map()
@@ -178,4 +178,11 @@ test('a nearly full memory asks the model to consolidate instead of adding', asy
     assert.match(prompt, /空间提醒/)
     assert.match(prompt, /优先用 patch/)
   })
+})
+
+test('the audit log rotates once it passes the size limit', () => {
+  assert.equal(needsRotation(0), false)
+  assert.equal(needsRotation(LOG_ROTATE_BYTES - 1), false)
+  assert.equal(needsRotation(LOG_ROTATE_BYTES), true)
+  assert.equal(needsRotation(LOG_ROTATE_BYTES * 4), true)
 })
