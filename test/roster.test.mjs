@@ -451,6 +451,53 @@ test('the turn endpoint matches by turn number, and by seq within one step', asy
   })
 })
 
+test('skills can be listed and moved between personas', async () => {
+  await withTempHome(async (home) => {
+    const { ctx, call } = fakeHost()
+    apply(ctx, {})
+    const headers = { 'x-dsh-persona': '1' }
+    await callApi(call, { method: 'POST', url: '/dsh-persona/api/create', headers, body: { name: '甲' } })
+    await callApi(call, { method: 'POST', url: '/dsh-persona/api/create', headers, body: { name: '乙' } })
+
+    const dirSkill = path.join(home, 'personas', 'slot-1', 'skills', 'alpha', 'SKILL.md')
+    await mkdir(path.dirname(dirSkill), { recursive: true })
+    await writeFile(dirSkill, '---\nname: alpha\ndescription: 目录式技能\n---\n\nbody\n', 'utf8')
+    const flatSkill = path.join(home, 'personas', 'slot-1', 'skills', 'beta.md')
+    await writeFile(flatSkill, '---\nname: beta\ndescription: 平铺技能\n---\n', 'utf8')
+
+    const listed = await callApi(call, { url: '/dsh-persona/api/skills?id=slot-1', headers })
+    assert.equal(listed.status, 200)
+    assert.deepEqual(listed.body.skills.map((item) => item.name), ['alpha', 'beta'])
+    assert.equal(listed.body.skills[0].kind, 'dir')
+    assert.equal(listed.body.skills[0].description, '目录式技能')
+    assert.equal(listed.body.skills[1].kind, 'flat')
+
+    const moved = await callApi(call, {
+      method: 'POST',
+      url: '/dsh-persona/api/skills/move',
+      headers,
+      body: { from: 'slot-1', to: 'slot-2', path: flatSkill },
+    })
+    assert.equal(moved.status, 200)
+    assert.match(moved.body.path, /slot-2/)
+
+    const after = await callApi(call, { url: '/dsh-persona/api/skills?id=slot-2', headers })
+    assert.deepEqual(after.body.skills.map((item) => item.name), ['beta'])
+
+    const escape = await callApi(call, {
+      method: 'POST',
+      url: '/dsh-persona/api/skills/move',
+      headers,
+      body: { from: 'slot-1', to: 'slot-2', path: path.join(home, 'personas', 'index.json') },
+    })
+    assert.equal(escape.status, 400)
+    assert.match(escape.body.error, /技能目录/)
+
+    const unknown = await callApi(call, { url: '/dsh-persona/api/skills?id=nobody', headers })
+    assert.equal(unknown.status, 400)
+  })
+})
+
 test('memory can be read and written through the panel api', async () => {
   await withTempHome(async (home) => {
     const { ctx, call } = fakeHost()
