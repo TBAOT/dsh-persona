@@ -207,6 +207,32 @@ test('a nearly full memory asks the model to consolidate instead of adding', asy
   })
 })
 
+test('the same turn is reviewed once, and the write leaves a traceable hash', async () => {
+  await withTempHome(async (home) => {
+    const reply = JSON.stringify({ ops: [{ target: 'memory', action: 'add', content: '项目用 pnpm' }] })
+    const host = fakeHost(reply)
+    apply(host.ctx, { personaId: 'tester' })
+    await feedTurn(host)
+    await emit(host.listeners, 'agent/turn-stopping', { agent: { id: 'session-1' }, turn: 7 })
+    await tick()
+    // A replayed hook for the same turn must not reach the model again.
+    await emit(host.listeners, 'agent/turn-stopping', { agent: { id: 'session-1' }, turn: 7 })
+    await tick()
+
+    assert.equal(host.calls.length, 1)
+    const memory = await readFile(path.join(home, 'personas', 'tester', 'memory', 'memory.md'), 'utf8')
+    assert.equal(memory.split('§').length, 1)
+
+    const evidence = await readFile(path.join(home, 'personas', 'tester', 'review', 'evidence.jsonl'), 'utf8')
+    const line = JSON.parse(evidence.trim().split('\n')[0])
+    assert.equal(line.turn, 7)
+    assert.match(line.events[0].hash, /^[0-9a-f]{12}$/)
+
+    const log = await readFile(path.join(home, 'personas', 'tester', 'review', 'log.jsonl'), 'utf8')
+    assert.match(log, /duplicate-turn/)
+  })
+})
+
 test('the audit log rotates once it passes the size limit', () => {
   assert.equal(needsRotation(0), false)
   assert.equal(needsRotation(LOG_ROTATE_BYTES - 1), false)
