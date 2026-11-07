@@ -47,13 +47,16 @@ async function withTempHome(fn) {
   } finally {
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 })
   }
 }
 
 const emit = (listeners, name, ...args) => Promise.all((listeners.get(name) ?? []).map((handler) => handler(...args)))
 
-const tick = () => new Promise((resolve) => setTimeout(resolve, 30))
+// The review is fire-and-forget, so its writes land after `turn-stopping` resolves.
+// CI runners (especially Windows + Node 20) are slow enough that a short fixed
+// sleep raced the audit write, so give the background work a real window.
+const tick = () => new Promise((resolve) => setTimeout(resolve, 250))
 
 function feedTurn(host, sessionId = 'session-1') {
   const session = { id: sessionId }
