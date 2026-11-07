@@ -86,6 +86,30 @@ test('a turn produces memory edits through the model', async () => {
   })
 })
 
+test('a reloaded instance still reviews the turn it missed', async () => {
+  await withTempHome(async (home) => {
+    // A previous instance persisted the digest before the plugin was reloaded.
+    const dir = path.join(home, 'storages', 'persona-buffers')
+    await mkdir(dir, { recursive: true })
+    await writeFile(
+      path.join(dir, 'session-1.json'),
+      JSON.stringify([{ role: 'user', text: '以后别用 npm，用 pnpm' }]),
+      'utf8',
+    )
+
+    const host = fakeHost(JSON.stringify({ ops: [{ target: 'memory', action: 'add', content: '项目用 pnpm' }] }))
+    apply(host.ctx, { personaId: 'tester' })
+    // No session/event for this instance: the turn's messages come from disk.
+    await emit(host.listeners, 'agent/turn-stopping', { agent: { id: 'session-1' }, turn: 1 })
+    await tick()
+
+    assert.equal(host.calls.length, 1)
+    assert.match(host.calls[0].messages[1].content[0].text, /pnpm/)
+    const log = await readFile(path.join(home, 'personas', 'tester', 'review', 'log.jsonl'), 'utf8')
+    assert.match(log, /"status":"written"/)
+  })
+})
+
 test('disabled review writes nothing', async () => {
   await withTempHome(async (home) => {
     const host = fakeHost(JSON.stringify({ ops: [] }))
