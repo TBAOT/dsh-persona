@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "note": "5 条由用户手写（source=user，待补），5 条取自历史会话的真实提问（source=history），2 条负例（expect=null，记忆里本来没有）。",
+  "questions": [
+    { "q": "换 GitHub token 怎么弄", "expect": "github-token", "source": "user-pending" },
+    { "q": "清理脚本都清哪些目录，多久跑一次", "expect": "磁盘与清理", "source": "user-pending" },
+    { "q": "记忆方案的技术文档放在哪个目录", "expect": "记忆方案文档", "source": "user-pending" },
+    { "q": "丢文件了怎么从会话日志里恢复", "expect": "记忆方案文档", "source": "user-pending" },
+    { "q": "soul-md 的人设卡当时是怎么迁进来的", "expect": "迁移脚本", "source": "user-pending" },
+    { "q": "GitHub token 存在哪里，代理不通怎么办", "expect": "github-token", "source": "history" },
+    { "q": "dsh-runtimes 能不能删", "expect": "磁盘与清理", "source": "history" },
+    { "q": "归档的会话还能搬回来吗", "expect": "磁盘与清理", "source": "history" },
+    { "q": "那份记忆系统技术方案一共几篇", "expect": "记忆方案文档", "source": "history" },
+    { "q": "migrate-soul-md 脚本会把卡片放哪", "expect": "迁移脚本", "source": "history" },
+    { "q": "Kubernetes 的 sidecar 注入怎么写", "expect": null, "source": "negative" },
+    { "q": "用 Rust 编译 WASM 的步骤", "expect": null, "source": "negative" }
+  ]
+}
