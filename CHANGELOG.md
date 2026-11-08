@@ -1,5 +1,19 @@
 # 变更日志
 
+## 0.4.0
+
+让「装不下」的细节有地方去，同时保住 Hermes 那套确定性：**常驻两层仍然全量注入、会话内冻结**，只是细节搬进主题库，提示词里只留一行索引。
+
+- 新增主题库 `personas/<id>/topics/<slug>.md`：frontmatter（slug / summary ≤60 字 / updated）+ 正文，单篇上限 4000 字符；同主题再次写入是**追加小节**，不是覆盖；完全相同的段落会跳过。
+- 提示词新增第三段 `persona:topics`：`slug｜summary｜绝对路径` 每行一条，预算 350 字符，超出时保留最新的并注明「另有 N 个主题未列出」；模型需要细节时按路径 `read`（与私有技能同一约定，不新增工具）。
+- 复盘 ops 支持 `target: "topic"`（带 `topic` slug 与 `summary`），与常驻两档互不影响；主题写入同样过不可见字符与密钥扫描。
+- 新增 `GET /topics?id=`（列表）、`POST /index/rebuild`（从主题文件重建 `memory/index/manifest.json`）。
+- 新增 `scripts/split-memory.mjs`：把常驻里属于「流程/参考」的条目搬进主题库，`--dry-run` 先出清单，备份原文到 `trash/` 后再改。
+- 迁移实跑：slot-1 常驻 15 条 / 2754 字符 → **11 条 / 2101 字符（70%）**，4 条细节进主题库（github-token、磁盘与清理、记忆方案文档、迁移脚本）。搬走后常驻只剩规则与约定。
+- 关闭方式：`config.topics=false` 退回纯常驻行为；`config.topicsIndexLimit` 调索引预算。
+
+本轮**没有**做召回（每轮检索注入）、双时态、TTL、门控——按计划留给 0.5.0，先用 probe 集证明按需读取够用。
+
 ## 0.3.1
 
 - **修复旁注“突兀”的真正原因**：`.dp-note` 的样式原本写在侧栏面板的 `<style>` 里，而面板没打开时那段样式根本不存在 —— 于是这行字以正文的深色和大字号渲染，看起来像正文的一部分。现在样式在客户模块加载时就注入 `document.head`（`dsh-persona-note-styles`），与面板是否打开无关。

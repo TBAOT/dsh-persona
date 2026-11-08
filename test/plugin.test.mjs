@@ -55,12 +55,12 @@ const tick = () => new Promise((resolve) => setTimeout(resolve, 20))
 /** The plugin no longer preloads at creation; keep the call sites harmless. */
 const fireCreated = (host, agent) => (host.listeners.get('agent/created') ?? []).forEach((handler) => handler({ agent }))
 
-test('registers one memory tool and two prompt sections', async () => {
+test('registers one memory tool and three prompt sections', async () => {
   await withTempHome(async () => {
     const host = fakeHost()
     apply(host.ctx, { personaId: 'tester' })
     assert.deepEqual([...host.tools.keys()], ['memory'])
-    assert.deepEqual([...host.sections.keys()].sort(), ['persona:memory', 'persona:user'])
+    assert.deepEqual([...host.sections.keys()].sort(), ['persona:memory', 'persona:topics', 'persona:user'])
   })
 })
 
