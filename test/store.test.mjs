@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   applyOperation,
   applyOperations,
+  withPersonaLock,
   formatEntries,
   inspectContent,
   parseEntries,
@@ -127,4 +128,15 @@ test('a near-duplicate add rewrites the existing entry instead of stacking up', 
   assert.equal(fresh.ok, true)
   assert.equal(fresh.entries.length, 2)
   assert.equal(fresh.mergedInto, undefined)
+})
+test('per-persona writes are serialised, so no batch is lost', async () => {
+  const order = []
+  const run = (tag, delay) =>
+    withPersonaLock('slot-x', async () => {
+      order.push(`${tag}:start`)
+      await new Promise((resolve) => setTimeout(resolve, delay))
+      order.push(`${tag}:end`)
+    })
+  await Promise.all([run('a', 20), run('b', 1)])
+  assert.deepEqual(order, ['a:start', 'a:end', 'b:start', 'b:end'])
 })
