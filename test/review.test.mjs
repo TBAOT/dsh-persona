@@ -239,3 +239,23 @@ test('the audit log rotates once it passes the size limit', () => {
   assert.equal(needsRotation(LOG_ROTATE_BYTES), true)
   assert.equal(needsRotation(LOG_ROTATE_BYTES * 4), true)
 })
+
+test('a written turn leaves per-entry metadata and one metric line', async () => {
+  await withTempHome(async (home) => {
+    const reply = JSON.stringify({ ops: [{ target: 'memory', action: 'add', content: '项目用 pnpm' }] })
+    const host = fakeHost(reply)
+    apply(host.ctx, { personaId: 'tester' })
+    await feedTurn(host)
+    await emit(host.listeners, 'agent/turn-stopping', { agent: { id: 'session-1' }, turn: 3 })
+    await tick()
+
+    const meta = JSON.parse(await readFile(path.join(home, 'personas', 'tester', 'memory', 'meta.json'), 'utf8'))
+    assert.equal(Object.keys(meta.entries).length, 1)
+    assert.equal(Object.values(meta.entries)[0].turn, 3)
+
+    const metrics = await readFile(path.join(home, 'personas', 'tester', 'review', 'metrics.jsonl'), 'utf8')
+    const line = JSON.parse(metrics.trim().split('\n').pop())
+    assert.equal(line.turn, 3)
+    assert.equal(line.resident[0].target, 'memory')
+  })
+})

@@ -1,5 +1,15 @@
 # 变更日志
 
+## 0.4.2
+
+补上 0.4.0 计划里被挤到后面的三项（都是「让记忆库可解释」的地基，不改变注入行为）：
+
+- **`memory/meta.json`**：每条记忆旁挂 `{ target, createdAt, turn, status }`，键是条目 hash，**不占一个正文字符**。写入后重建一次，删除或改写会自然丢掉旧记录，不会长期漂移。
+- **near-duplicate 合并**：`add` 的条目与已有条目 token 相似度 ≥0.8 时，替换旧条目而不是并存，审计里记 `mergedInto`。阈值刻意保守——只吃「同一句话的改写」，宁可多留一条，也不误合并两个不同事实。
+- **`review/metrics.jsonl`**：每轮一条 `{ at, turn, sessionId, resident:[{target,used}], topics:[slug], merges:[hash], ms }`，用来回答「这一轮注入了什么、写了什么、花了多久」。
+
+新增 2 项测试（近重复合并、写入后 meta/metrics 落盘），共 67 项。
+
 ## 0.4.1
 
 补上 0.4.0 计划里的两件收尾：

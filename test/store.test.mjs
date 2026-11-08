@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+
 import {
   applyOperation,
   applyOperations,
@@ -112,4 +113,18 @@ test('usage and render include percent header', () => {
 
 test('totalChars accounts for separators', () => {
   assert.equal(totalChars(['ab', 'cd']), 4 + '\n§\n'.length)
+})
+
+test('a near-duplicate add rewrites the existing entry instead of stacking up', () => {
+  const existing = ['项目一律用 pnpm，不生成 package-lock.json']
+  const merged = applyOperation(existing, { action: 'add', content: '项目一律用 pnpm，不生成 package-lock.json 文件' })
+  assert.equal(merged.ok, true)
+  assert.equal(merged.entries.length, 1)
+  assert.match(merged.entries[0], /pnpm/)
+  assert.match(merged.mergedInto, /^[0-9a-f]{12}$/)
+
+  const fresh = applyOperation(existing, { action: 'add', content: '打印机墨盒芯片读不到时换墨盒即可' })
+  assert.equal(fresh.ok, true)
+  assert.equal(fresh.entries.length, 2)
+  assert.equal(fresh.mergedInto, undefined)
 })
