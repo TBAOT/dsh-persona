@@ -35,14 +35,20 @@ export function tokens(text) {
   return set
 }
 
+function coverage(queryTokens, docTokens) {
+  if (!queryTokens.size || !docTokens.size) return 0
+  let shared = 0
+  for (const token of queryTokens) if (docTokens.has(token)) shared += 1
+  return (shared / queryTokens.size) * 0.75 + (shared / docTokens.size) * 0.25
+}
+
 export function score(query, topic) {
   const q = tokens(query)
-  const doc = tokens(`${topic.slug} ${topic.summary} ${topic.body}`)
-  if (!q.size || !doc.size) return 0
-  let shared = 0
-  for (const token of q) if (doc.has(token)) shared += 1
-  // Coverage of the question, tempered by how much of the document it touches.
-  return (shared / q.size) * 0.75 + (shared / doc.size) * 0.25
+  // The prompt only shows slug + summary, so that line is what decides whether
+  // the model ever opens the file; the body is a supporting signal, not the lead.
+  const head = coverage(q, tokens(`${topic.slug} ${topic.summary}`))
+  const body = coverage(q, tokens(topic.body))
+  return head * 0.7 + body * 0.3
 }
 
 export function rank(query, topics) {
