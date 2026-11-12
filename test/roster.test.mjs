@@ -613,3 +613,29 @@ test('a limit outside the sane range is refused', async () => {
     assert.match(bad.body.error, /200–20000/)
   })
 })
+
+test('a session id resolves its persona through the cached workspace path', async () => {
+  await withTempHome(async (home) => {
+    const { ctx, call } = fakeHost()
+    apply(ctx, {})
+    const headers = { 'x-dsh-persona': '1' }
+    await callApi(call, { method: 'POST', url: '/dsh-persona/api/create', headers, body: { name: '甲' } })
+    await callApi(call, { method: 'POST', url: '/dsh-persona/api/bind', headers, body: { id: 'slot-1', workspace: home } })
+
+    const dir = path.join(home, 'storages', 'session_projcache', 'sessions')
+    await mkdir(dir, { recursive: true })
+    await writeFile(
+      path.join(dir, 'session-abc.json'),
+      JSON.stringify({ version: 1, record: { identity: { cwd: home }, rows: {} } }),
+      'utf8',
+    )
+
+    const resolved = await callApi(call, { url: '/dsh-persona/api/resolve?session=session-abc', headers })
+    assert.equal(resolved.status, 200)
+    assert.equal(resolved.body.cwd, home)
+    assert.equal(resolved.body.persona.id, 'slot-1')
+
+    const missing = await callApi(call, { url: '/dsh-persona/api/resolve?session=../evil', headers })
+    assert.equal(missing.body.persona, null)
+  })
+})
