@@ -51,6 +51,18 @@ async function withTempHome(fn) {
   }
 }
 
+/** Poll until the background review has written the file, instead of guessing a delay. */
+async function waitForFile(file, timeoutMs = 4000) {
+  const started = Date.now()
+  for (;;) {
+    try {
+      return await readFile(file, 'utf8')
+    } catch {
+      if (Date.now() - started > timeoutMs) throw new Error(`timed out waiting for ${file}`)
+      await new Promise((resolve) => setTimeout(resolve, 25))
+    }
+  }
+}
 const emit = (listeners, name, ...args) => Promise.all((listeners.get(name) ?? []).map((handler) => handler(...args)))
 
 // The review is fire-and-forget, so its writes land after `turn-stopping` resolves.
@@ -249,11 +261,11 @@ test('a written turn leaves per-entry metadata and one metric line', async () =>
     await emit(host.listeners, 'agent/turn-stopping', { agent: { id: 'session-1' }, turn: 3 })
     await tick()
 
-    const meta = JSON.parse(await readFile(path.join(home, 'personas', 'tester', 'memory', 'meta.json'), 'utf8'))
+    const meta = JSON.parse(await waitForFile(path.join(home, 'personas', 'tester', 'memory', 'meta.json')))
     assert.equal(Object.keys(meta.entries).length, 1)
     assert.equal(Object.values(meta.entries)[0].turn, 3)
 
-    const metrics = await readFile(path.join(home, 'personas', 'tester', 'review', 'metrics.jsonl'), 'utf8')
+    const metrics = await waitForFile(path.join(home, 'personas', 'tester', 'review', 'metrics.jsonl'))
     const line = JSON.parse(metrics.trim().split('\n').pop())
     assert.equal(line.turn, 3)
     assert.equal(line.resident[0].target, 'memory')
