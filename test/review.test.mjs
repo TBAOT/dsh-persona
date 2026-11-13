@@ -119,7 +119,7 @@ test('a reloaded instance still reviews the turn it missed', async () => {
 
     assert.equal(host.calls.length, 1)
     assert.match(host.calls[0].messages[1].content[0].text, /pnpm/)
-    const log = await readFile(path.join(home, 'personas', 'tester', 'review', 'log.jsonl'), 'utf8')
+    const log = await waitForFile(path.join(home, 'personas', 'tester', 'review', 'log.jsonl'))
     assert.match(log, /"status":"written"/)
   })
 })
