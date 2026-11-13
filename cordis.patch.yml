@@ -6,10 +6,12 @@
       name: "dsh-persona"
       config:
         personaId: "default"
+        routeThreshold: 0.9
     - id: "persona-review"
       name: "dsh-persona/review"
       config:
         personaId: "default"
+        routeThreshold: 0.9
     - id: "persona-roster"
       name: "dsh-persona/roster"
       config: {}

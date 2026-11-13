@@ -16,8 +16,8 @@ const here = path.dirname(fileURLToPath(import.meta.url))
 const target = path.join(here, '..', 'cordis.patch.yml')
 
 const rows = [
-  { id: 'persona-memory', name: 'dsh-persona', config: { personaId: 'default' } },
-  { id: 'persona-review', name: 'dsh-persona/review', config: { personaId: 'default' } },
+  { id: 'persona-memory', name: 'dsh-persona', config: { personaId: 'default', routeThreshold: 0.9 } },
+  { id: 'persona-review', name: 'dsh-persona/review', config: { personaId: 'default', routeThreshold: 0.9 } },
   { id: 'persona-roster', name: 'dsh-persona/roster', config: {} },
   { id: 'persona-skills', name: 'dsh-persona/skills', config: {} },
 ]

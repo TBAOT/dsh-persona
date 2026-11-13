@@ -322,3 +322,22 @@ test('an unparseable answer still leaves a metric line', async () => {
     assert.equal(metrics.reason, 'parse-failed')
   })
 })
+test('a full resident tier turns a review add into a threshold rejection', async () => {
+  await withTempHome(async (home) => {
+    const dir = path.join(home, 'personas', 'tester', 'memory')
+    await mkdir(dir, { recursive: true })
+    await writeFile(path.join(dir, 'memory.md'), `<!-- dsh-persona v1 target=memory -->\n${'规则'.repeat(400)}\n`, 'utf8')
+
+    const host = fakeHost([{ text: JSON.stringify({ ops: [{ target: 'memory', action: 'add', content: '一条新规则' }] }), finishReason: 'stop' }])
+    apply(host.ctx, { personaId: 'tester', routeThreshold: 0.01 })
+    await feedTurn(host)
+    await emit(host.listeners, 'agent/turn-stopping', { agent: { id: 'session-1' }, turn: 9 })
+    await tick()
+
+    const log = await readFile(path.join(home, 'personas', 'tester', 'review', 'log.jsonl'), 'utf8')
+    assert.match(log, /"reason":"threshold"/)
+
+    const metrics = JSON.parse((await waitForFile(path.join(home, 'personas', 'tester', 'review', 'metrics.jsonl'))).trim().split('\n').pop())
+    assert.equal(metrics.blocked, 1)
+  })
+})

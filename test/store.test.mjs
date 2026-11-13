@@ -140,3 +140,27 @@ test('per-persona writes are serialised, so no batch is lost', async () => {
   await Promise.all([run('a', 20), run('b', 1)])
   assert.deepEqual(order, ['a:start', 'a:end', 'b:start', 'b:end'])
 })
+test('a nearly full tier refuses new entries but still accepts rewrites and removals', () => {
+  const limit = 200
+  const base = '项目约定一律用 pnpm 安装依赖并且不生成锁文件；'
+  const full = [`${base.repeat(7)} ZETA`]
+  assert.ok(full[0].length >= limit * 0.9)
+
+  const blocked = applyOperations(full, [{ action: 'add', content: '打印机墨盒读不到时换一支即可' }], limit)
+  assert.equal(blocked.ok, false)
+  assert.equal(blocked.blocked, 'threshold')
+  assert.equal(blocked.entries.length, 1)
+
+  const merged = applyOperations(full, [{ action: 'add', content: `${base.repeat(7)}。` }], limit)
+  assert.equal(merged.ok, true)
+  assert.equal(merged.entries.length, 1)
+
+  const patched = applyOperations(full, [{ action: 'patch', old_text: 'ZETA', content: 'ZETA（严格）' }], limit)
+  assert.equal(patched.ok, true)
+
+  const removed = applyOperations(full, [{ action: 'remove', old_text: 'ZETA' }], limit)
+  assert.equal(removed.ok, true)
+
+  const disabled = applyOperations(full, [{ action: 'add', content: '再来一条' }], limit, { routeThreshold: 0 })
+  assert.equal(disabled.ok, true)
+})
