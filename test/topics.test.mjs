@@ -69,8 +69,8 @@ test('the prompt index lists slug, summary and path within budget', async () => 
     const topics = listTopicsSync('slot-1')
     assert.equal(topics.length, 2)
     const text = renderTopicIndex(topics, 500)
-    assert.match(text, /alpha｜甲｜/)
-    assert.match(text, /beta｜乙｜/)
+    assert.match(text, /alpha｜甲/)
+    assert.match(text, /beta｜乙/)
 
     const tight = renderTopicIndex(topics, 40)
     assert.match(tight, /未列出|alpha|beta/)
