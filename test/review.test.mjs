@@ -28,9 +28,11 @@ function fakeHost(responseText) {
     llm: {
       stream(options) {
         calls.push(options)
+        const queued = Array.isArray(responseText) ? responseText.shift() : { text: responseText, finishReason: '' }
+        const item = queued ?? { text: '', finishReason: '' }
         return (async function* generate() {
-          yield { type: 'text-delta', text: responseText }
-          yield { type: 'finish' }
+          yield { type: 'text-delta', text: item.text }
+          yield { type: 'finish', finishReason: item.finishReason ?? '' }
         })()
       },
     },
@@ -158,8 +160,8 @@ test('malformed model output is recorded, not applied', async () => {
     await tick()
 
     const log = await readFile(path.join(home, 'personas', 'tester', 'review', 'log.jsonl'), 'utf8')
-    assert.match(log, /"ok":true/)
-    assert.match(log, /no-ops|parse-failed/)
+    assert.match(log, /"status":"failed"/)
+    assert.match(log, /parse-failed/)
   })
 })
 
@@ -269,5 +271,54 @@ test('a written turn leaves per-entry metadata and one metric line', async () =>
     const line = JSON.parse(metrics.trim().split('\n').pop())
     assert.equal(line.turn, 3)
     assert.equal(line.resident[0].target, 'memory')
+  })
+})
+test('a torn JSON tail is salvaged instead of losing the whole turn', async () => {
+  await withTempHome(async (home) => {
+    const torn = '{"ops":[{"target":"memory","action":"add","content":"第一条救回来的"},{"target":"memory","action":"add","content":"这条被截断'
+    const host = fakeHost([{ text: torn, finishReason: 'length' }])
+    apply(host.ctx, { personaId: 'tester' })
+    await feedTurn(host)
+    await emit(host.listeners, 'agent/turn-stopping', { agent: { id: 'session-1' }, turn: 5 })
+    await tick()
+
+    const memory = await readFile(path.join(home, 'personas', 'tester', 'memory', 'memory.md'), 'utf8')
+    assert.match(memory, /第一条救回来的/)
+
+    const metrics = JSON.parse((await waitForFile(path.join(home, 'personas', 'tester', 'review', 'metrics.jsonl'))).trim().split('\n').pop())
+    assert.equal(metrics.status, 'written')
+    assert.equal(metrics.salvaged, 1)
+  })
+})
+
+test('a truncated output is retried once with a bigger budget', async () => {
+  await withTempHome(async (home) => {
+    const host = fakeHost([
+      { text: '{"ops":[{"target":"memory","action":"add","content":', finishReason: 'length' },
+      { text: '{"ops":[{"target":"memory","action":"add","content":"重试成功"}]}', finishReason: 'stop' },
+    ])
+    apply(host.ctx, { personaId: 'tester' })
+    await feedTurn(host)
+    await emit(host.listeners, 'agent/turn-stopping', { agent: { id: 'session-1' }, turn: 6 })
+    await tick()
+
+    assert.equal(host.calls.length, 2)
+    assert.ok(host.calls[1].maxTokens > host.calls[0].maxTokens)
+    const memory = await readFile(path.join(home, 'personas', 'tester', 'memory', 'memory.md'), 'utf8')
+    assert.match(memory, /重试成功/)
+  })
+})
+
+test('an unparseable answer still leaves a metric line', async () => {
+  await withTempHome(async (home) => {
+    const host = fakeHost([{ text: '这不是 JSON', finishReason: 'stop' }])
+    apply(host.ctx, { personaId: 'tester' })
+    await feedTurn(host)
+    await emit(host.listeners, 'agent/turn-stopping', { agent: { id: 'session-1' }, turn: 7 })
+    await tick()
+
+    const metrics = JSON.parse((await waitForFile(path.join(home, 'personas', 'tester', 'review', 'metrics.jsonl'))).trim().split('\n').pop())
+    assert.equal(metrics.status, 'failed')
+    assert.equal(metrics.reason, 'parse-failed')
   })
 })

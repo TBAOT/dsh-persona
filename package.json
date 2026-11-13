@@ -1,6 +1,6 @@
 {
   "name": "dsh-persona",
-  "version": "0.4.5",
+  "version": "0.5.0",
   "description": "Multi-persona memory for DeepSeek Harness: two-tier persona memory (user profile + agent notes) with per-turn review. 多个角色各自独立的长期记忆。",
   "type": "module",
   "main": "lib/memory.js",

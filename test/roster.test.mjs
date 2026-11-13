@@ -639,3 +639,34 @@ test('a session id resolves its persona through the cached workspace path', asyn
     assert.equal(missing.body.persona, null)
   })
 })
+test('topics can be written through the panel api, and stats reports them', async () => {
+  await withTempHome(async (home) => {
+    const { ctx, call } = fakeHost()
+    apply(ctx, {})
+    const headers = { 'x-dsh-persona': '1' }
+    await callApi(call, { method: 'POST', url: '/dsh-persona/api/create', headers, body: { name: '甲' } })
+
+    const written = await callApi(call, {
+      method: 'POST',
+      url: '/dsh-persona/api/topics',
+      headers,
+      body: { id: 'slot-1', slug: 'printer', summary: '打印机排查', content: '现象：队列为空' },
+    })
+    assert.equal(written.status, 200)
+    assert.equal(written.body.slug, 'printer')
+
+    const stats = await callApi(call, { url: '/dsh-persona/api/memory/stats?id=slot-1', headers })
+    assert.equal(stats.status, 200)
+    assert.equal(stats.body.topics.count, 1)
+    assert.equal(typeof stats.body.resident.memory.used, 'number')
+    assert.equal(typeof stats.body.drift.rebuilt, 'boolean')
+
+    const manifestPath = path.join(home, 'personas', 'slot-1', 'memory', 'index', 'manifest.json')
+    await rm(manifestPath, { force: true })
+    const healed = await callApi(call, { url: '/dsh-persona/api/memory/stats?id=slot-1', headers })
+    assert.equal(healed.body.drift.rebuilt, true)
+
+    const manifest = path.join(home, 'personas', 'slot-1', 'memory', 'index', 'manifest.json')
+    assert.match(await readFile(manifest, 'utf8'), /printer/)
+  })
+})

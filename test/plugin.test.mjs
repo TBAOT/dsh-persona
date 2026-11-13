@@ -151,6 +151,6 @@ test('unknown target is rejected', async () => {
     const tool = host.tools.get('memory')
     const result = await tool.execute({ target: 'nope', operations: [] }, { agent: { id: 'x' } })
     assert.equal(result.ok, false)
-    assert.match(result.text, /user 或 memory/)
+    assert.match(result.text, /user、memory 或 topic/)
   })
 })
