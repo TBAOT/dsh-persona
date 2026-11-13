@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
@@ -322,7 +322,7 @@ test('an unparseable answer still leaves a metric line', async () => {
     assert.equal(metrics.reason, 'parse-failed')
   })
 })
-test('a full resident tier turns a review add into a threshold rejection', async () => {
+test('a full resident tier turns a review add into a topic instead of rejecting it', async () => {
   await withTempHome(async (home) => {
     const dir = path.join(home, 'personas', 'tester', 'memory')
     await mkdir(dir, { recursive: true })
@@ -335,9 +335,12 @@ test('a full resident tier turns a review add into a threshold rejection', async
     await tick()
 
     const log = await readFile(path.join(home, 'personas', 'tester', 'review', 'log.jsonl'), 'utf8')
-    assert.match(log, /"reason":"threshold"/)
+    assert.match(log, /"redirected":true/)
+
+    const topicFiles = await readdir(path.join(home, 'personas', 'tester', 'topics'))
+    assert.equal(topicFiles.length, 1)
 
     const metrics = JSON.parse((await waitForFile(path.join(home, 'personas', 'tester', 'review', 'metrics.jsonl'))).trim().split('\n').pop())
-    assert.equal(metrics.blocked, 1)
+    assert.equal(metrics.redirected, 1)
   })
 })

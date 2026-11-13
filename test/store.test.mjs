@@ -146,10 +146,14 @@ test('a nearly full tier refuses new entries but still accepts rewrites and remo
   const full = [`${base.repeat(7)} ZETA`]
   assert.ok(full[0].length >= limit * 0.9)
 
-  const blocked = applyOperations(full, [{ action: 'add', content: '打印机墨盒读不到时换一支即可' }], limit)
-  assert.equal(blocked.ok, false)
-  assert.equal(blocked.blocked, 'threshold')
-  assert.equal(blocked.entries.length, 1)
+  const diverted = applyOperations(full, [{ action: 'add', content: '打印机墨盒读不到时换一支即可' }], limit)
+  assert.equal(diverted.ok, true)
+  assert.equal(diverted.redirects.length, 1)
+  assert.equal(diverted.entries.length, 1)
+
+  const refused = applyOperations(full, [{ action: 'add', content: '再来一条' }], limit, { addOverflow: 'reject' })
+  assert.equal(refused.ok, false)
+  assert.equal(refused.blocked, 'threshold')
 
   const merged = applyOperations(full, [{ action: 'add', content: `${base.repeat(7)}。` }], limit)
   assert.equal(merged.ok, true)
