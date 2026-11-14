@@ -5,6 +5,8 @@ import {
   applyOperation,
   applyOperations,
   withPersonaLock,
+  entryHash,
+  visibleEntries,
   formatEntries,
   inspectContent,
   parseEntries,
@@ -167,4 +169,18 @@ test('a nearly full tier refuses new entries but still accepts rewrites and remo
 
   const disabled = applyOperations(full, [{ action: 'add', content: '再来一条' }], limit, { routeThreshold: 0 })
   assert.equal(disabled.ok, true)
+})
+test('expired and superseded entries stop being injected but stay in the file', () => {
+  const active = '仍然有效的规则'
+  const expired = '早就该退场的事实'
+  const replaced = '被新条目推翻的旧事实'
+  const meta = {
+    entries: {
+      [entryHash(expired)]: { status: 'active', expiresAt: '2000-01-01' },
+      [entryHash(replaced)]: { status: 'superseded', invalidAt: '2026-01-01T00:00:00Z' },
+    },
+  }
+  const visible = visibleEntries([active, expired, replaced], meta, '2026-11-14')
+  assert.deepEqual(visible, [active])
+  assert.equal(visibleEntries([active, expired], { entries: {} }, '2026-11-14').length, 2)
 })
