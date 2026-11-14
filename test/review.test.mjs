@@ -344,3 +344,17 @@ test('a full resident tier turns a review add into a topic instead of rejecting 
     assert.equal(metrics.redirected, 1)
   })
 })
+test('a bare acknowledgement skips the review and says why', async () => {
+  await withTempHome(async (home) => {
+    const host = fakeHost([{ text: '{"ops":[]}', finishReason: 'stop' }])
+    apply(host.ctx, { personaId: 'tester' })
+    await emit(host.listeners, 'session/event', { id: 'session-1' }, { type: 'user/message', message: { content: [{ type: 'text', text: '嗯' }] } })
+    await emit(host.listeners, 'agent/turn-stopping', { agent: { id: 'session-1' }, turn: 11 })
+    await tick()
+
+    assert.equal(host.calls.length, 0, '不该为一句「嗯」调用模型')
+    const metrics = JSON.parse((await waitForFile(path.join(home, 'personas', 'tester', 'review', 'metrics.jsonl'))).trim().split('\n').pop())
+    assert.equal(metrics.status, 'skipped')
+    assert.equal(metrics.reason, 'trivial')
+  })
+})
