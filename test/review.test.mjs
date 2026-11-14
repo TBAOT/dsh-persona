@@ -32,6 +32,7 @@ function fakeHost(responseText) {
         const item = queued ?? { text: '', finishReason: '' }
         return (async function* generate() {
           yield { type: 'text-delta', text: item.text }
+          if (item.usage) yield { type: 'usage', usage: item.usage }
           yield { type: 'finish', finishReason: item.finishReason ?? '' }
         })()
       },
@@ -356,5 +357,21 @@ test('a bare acknowledgement skips the review and says why', async () => {
     const metrics = JSON.parse((await waitForFile(path.join(home, 'personas', 'tester', 'review', 'metrics.jsonl'))).trim().split('\n').pop())
     assert.equal(metrics.status, 'skipped')
     assert.equal(metrics.reason, 'trivial')
+  })
+})
+test('token usage reported by the stream lands in the metrics', async () => {
+  await withTempHome(async (home) => {
+    const host = fakeHost([{
+      text: '{"ops":[]}',
+      finishReason: 'stop',
+      usage: { input_tokens: 1200, output_tokens: 40, cache_read_input_tokens: 900 },
+    }])
+    apply(host.ctx, { personaId: 'tester' })
+    await feedTurn(host)
+    await emit(host.listeners, 'agent/turn-stopping', { agent: { id: 'session-1' }, turn: 12 })
+    await tick()
+
+    const metrics = JSON.parse((await waitForFile(path.join(home, 'personas', 'tester', 'review', 'metrics.jsonl'))).trim().split('\n').pop())
+    assert.deepEqual(metrics.tokens, { in: 1200, out: 40, cacheRead: 900 })
   })
 })

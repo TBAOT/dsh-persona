@@ -1,5 +1,11 @@
 # 变更日志
 
+## 0.8.3
+
+- **token 与缓存计量**：collect() 现在捕获流里的 {type:'usage', usage} 块，metrics.jsonl 每条记录多一个 	okens: { in, out, cacheRead }（字段按 DSH 的 input_tokens / output_tokens / cache_read_input_tokens 读，缺失记 0）。
+- 跳过与失败路径同样带 	okens（全 0），指标形状统一。
+- 测试 84 项（新增：流里带 usage 时指标如实记录）。
+
 ## 0.8.2
 
 - **probe 分半验证**：pnpm probe --half=tune|verify，偶数位调参、奇数位验收。此前「同一批题调权重再报 100%」属于自欺，现在两个半区可以分开跑、分开看。
