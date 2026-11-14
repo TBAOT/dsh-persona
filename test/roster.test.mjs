@@ -670,3 +670,32 @@ test('topics can be written through the panel api, and stats reports them', asyn
     assert.match(await readFile(manifest, 'utf8'), /printer/)
   })
 })
+test('history lists what was invalidated or expired, and can show everything', async () => {
+  await withTempHome(async (home) => {
+    const { ctx, call } = fakeHost()
+    apply(ctx, {})
+    const headers = { 'x-dsh-persona': '1' }
+    await callApi(call, { method: 'POST', url: '/dsh-persona/api/create', headers, body: { name: '甲' } })
+
+    const dir = path.join(home, 'personas', 'slot-1', 'memory')
+    await mkdir(dir, { recursive: true })
+    await writeFile(path.join(dir, 'memory.md'), '<!-- dsh-persona v1 target=memory -->\n仍然有效的条目\n', 'utf8')
+    const { entryHash, refreshMeta } = await import('../lib/store.js')
+    const oldHash = entryHash('被推翻的旧事实')
+    await writeFile(
+      path.join(dir, 'meta.json'),
+      JSON.stringify({ version: 2, entries: { [oldHash]: { target: 'memory', status: 'active', preview: '被推翻的旧事实' } } }),
+      'utf8',
+    )
+    await refreshMeta('slot-1', { at: new Date().toISOString(), superseded: { [oldHash]: entryHash('仍然有效的条目') } })
+
+    const hidden = await callApi(call, { url: '/dsh-persona/api/memory/history?id=slot-1', headers })
+    assert.equal(hidden.status, 200)
+    assert.equal(hidden.body.count, 1)
+    assert.equal(hidden.body.entries[0].status, 'superseded')
+    assert.ok(hidden.body.entries[0].supersededBy)
+
+    const all = await callApi(call, { url: '/dsh-persona/api/memory/history?id=slot-1&show=all', headers })
+    assert.equal(all.body.count, 2)
+  })
+})
