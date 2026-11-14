@@ -13,6 +13,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
 import { listTopicsSync } from '../lib/topics.js'
+// NOTE: scoring here mirrors lib/recall.js on purpose — the probe must be able to\n// run (and fail) independently of the live path it measures.
 
 const DSH_HOME = process.env.DSH_HOME || path.join(os.homedir(), '.dsh')
 const personaArg = process.argv.find((arg) => arg.startsWith('--persona='))?.split('=')[1]
