@@ -58,7 +58,14 @@ export function rank(query, topics) {
     .sort((left, right) => right.score - left.score)
 }
 
-const questions = JSON.parse(readFileSync(path.join(import.meta.dirname, '..', 'test', 'probe', 'questions.json'), 'utf8')).questions
+const allQuestions = JSON.parse(readFileSync(path.join(import.meta.dirname, '..', 'test', 'probe', 'questions.json'), 'utf8')).questions
+// Held-out split: tune on even indexes, verify on odd ones. Otherwise the numbers
+// are just "we tuned on the test set and it passed".
+const half = process.argv.find((arg) => arg.startsWith('--half='))?.split('=')[1] ?? ''
+const questions =
+  half === 'tune' ? allQuestions.filter((_, index) => index % 2 === 0)
+  : half === 'verify' ? allQuestions.filter((_, index) => index % 2 === 1)
+  : allQuestions
 const personas = personaArg
   ? [personaArg]
   : ['slot-1', 'slot-2', 'default'].filter((id) => listTopicsSync(id).length)
