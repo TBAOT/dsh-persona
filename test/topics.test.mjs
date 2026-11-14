@@ -6,6 +6,8 @@ import test from 'node:test'
 import { mkdir } from 'node:fs/promises'
 import {
   TOPIC_MAX_CHARS,
+  archiveTopic,
+  isTopicExpired,
   listTopicsSync,
   overlap,
   readTopic,
@@ -89,5 +91,22 @@ test('rebuilding the manifest reads the topic files', async () => {
     assert.equal(result.count, 1)
     const manifest = JSON.parse(await readFile(path.join(home, 'personas', 'slot-1', 'memory', 'index', 'manifest.json'), 'utf8'))
     assert.equal(manifest.topics[0].slug, 'one')
+  })
+})
+
+test('a topic that stopped changing expires, and archiving retires it without deleting', async () => {
+  const old = { slug: 'old', summary: '旧', updated: '2026-01-01' }
+  const fresh = { slug: 'new', summary: '新', updated: '2026-11-14' }
+  assert.equal(isTopicExpired(old, 90, '2026-11-14'), true)
+  assert.equal(isTopicExpired(fresh, 90, '2026-11-14'), false)
+  assert.equal(isTopicExpired(old, 0, '2026-11-14'), false, 'ttlDays=0 关闭过期')
+
+  await withTempHome(async () => {
+    await writeTopic('slot-1', { slug: 'dead', summary: '要归档的', content: '正文一条' })
+    const archived = await archiveTopic('slot-1', 'dead')
+    assert.equal(archived.ok, true)
+    assert.equal(listTopicsSync('slot-1').length, 0)
+    const kept = await readFile(archived.archived, 'utf8')
+    assert.match(kept, /正文一条/)
   })
 })
