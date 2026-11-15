@@ -16,7 +16,7 @@ async function withTempHome(fn) {
   } finally {
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    await rm(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
   }
 }
 

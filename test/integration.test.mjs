@@ -60,12 +60,29 @@ async function withTempHome(fn) {
   } finally {
     if (previous === undefined) delete process.env.DSH_HOME
     else process.env.DSH_HOME = previous
-    await rm(home, { recursive: true, force: true })
+    // Windows + Node 20 hands back ENOTEMPTY when a background review still holds a
+    // handle on the file it just wrote; retrying is the documented fix, and CI caught it.
+    await rm(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
   }
 }
 
 const emit = (listeners, name, ...args) => Promise.all((listeners.get(name) ?? []).map((handler) => handler(...args)))
 const tick = () => new Promise((resolve) => setTimeout(resolve, 250))
+
+/** Poll instead of sleeping: the review writes in the background, slower on CI. */
+async function waitForFile(file, timeoutMs = 5000) {
+  const started = Date.now()
+  for (;;) {
+    try {
+      const text = await readFile(file, 'utf8')
+      if (text.trim()) return text
+    } catch {
+      /* not there yet */
+    }
+    if (Date.now() - started > timeoutMs) throw new Error(`timed out waiting for ${file}`)
+    await new Promise((resolve) => setTimeout(resolve, 25))
+  }
+}
 
 test('a turn injects recall and the review records it as injected', async () => {
   await withTempHome(async (home) => {
@@ -91,10 +108,9 @@ test('a turn injects recall and the review records it as injected', async () => 
       message: { content: [{ type: 'text', text: '清理脚本都清哪些目录' }] },
     })
     await emit(host.listeners, 'agent/turn-stopping', { agent, turn })
-    await tick()
 
     const file = path.join(home, 'personas', 'tester', 'review', 'metrics.jsonl')
-    const metric = JSON.parse((await readFile(file, 'utf8')).trim().split('\n').pop())
+    const metric = JSON.parse((await waitForFile(file)).trim().split('\n').pop())
     assert.equal(metric.recall.outcome, 'injected', '指标必须如实反映这一轮注入过')
     assert.ok(metric.recall.chars > 0)
     assert.deepEqual(metric.recall.topics, ['磁盘与清理'])
@@ -122,9 +138,8 @@ test('a turn whose step is rejected never claims an injection', async () => {
       message: { content: [{ type: 'text', text: '顺便记一下清理脚本的路径' }] },
     })
     await emit(host.listeners, 'agent/turn-stopping', { agent, turn: 3 })
-    await tick()
     const metric = JSON.parse(
-      (await readFile(path.join(home, 'personas', 'tester', 'review', 'metrics.jsonl'), 'utf8')).trim().split('\n').pop(),
+      (await waitForFile(path.join(home, 'personas', 'tester', 'review', 'metrics.jsonl'))).trim().split('\n').pop(),
     )
     assert.notEqual(metric.recall.outcome, 'injected')
   })
