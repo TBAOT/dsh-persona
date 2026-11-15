@@ -163,7 +163,11 @@ node scripts/migrate-soul-md.mjs --persona slot-1 \
 其余可调项（都在同一行 config 下）：`topics` 关掉主题库、`topicsIndexLimit` 索引字符上限（默认 600）、
 `topicTtlDays` 主题多久不更新就不再注入（默认 90，0 关闭）、`recallTopN` 每轮召回几篇摘要（默认 3，0 关闭）、
 `recallBudget` 召回块字符预算（默认 400）、`routeThreshold` 常驻到这个比例就把 add 转存主题（默认 0.9）、
-`addOverflow: reject` 改回硬拒绝。
+`addOverflow: reject` 改回硬拒绝；`consolidate` 关掉复盘后的后台整理轮（默认开）、`consolidateThreshold`
+它在哪个占用比之后动手（默认 0.9）、`consolidateCooldownMs` 两次整理的最小间隔（默认 30 分钟）。
+
+**常驻条目是「一条一个事实、不超过 120 字」**：对话轮只做精确编辑（add/patch/remove），整层重写
+（`rethink`）不给对话轮用，只由复盘后的后台整理轮调用——照 Letta 把 `memory_rethink` 留给 sleep-time 的做法。
 
 ## 检索与评测
 

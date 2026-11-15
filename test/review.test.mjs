@@ -360,6 +360,38 @@ test('a bare acknowledgement skips the review and says why', async () => {
     assert.equal(metrics.reason, 'trivial')
   })
 })
+test('a tight tier is rewritten by the background pass, not by the chat turn', async () => {
+  await withTempHome(async (home) => {
+    const host = fakeHost([
+      { text: '{"ops":[]}', finishKind: 'stop' },                              // the review itself
+      { text: '{"entries":["新条目甲","新条目乙"]}', finishKind: 'stop' },     // the consolidation pass
+    ])
+    apply(host.ctx, { personaId: 'tester', memoryLimit: 100, userLimit: 200 })
+    // Fill the tier past 90% (2 × 48 chars + separators > 90).
+    const dir = path.join(home, 'personas', 'tester', 'memory')
+    await mkdir(dir, { recursive: true })
+    await writeFile(path.join(dir, 'memory.md'), `<!-- dsh-persona v1 target=memory -->\n${'甲'.repeat(48)}\n§\n${'乙'.repeat(48)}\n`, 'utf8')
+
+    await feedTurn(host)
+    await emit(host.listeners, 'agent/turn-stopping', { agent: { id: 'session-1' }, turn: 4 })
+    await tick()
+
+    assert.equal(host.calls.length, 2, '多出来的一次调用就是后台整理')
+    const text = await readFile(path.join(dir, 'memory.md'), 'utf8')
+    assert.match(text, /新条目甲/)
+    assert.match(text, /新条目乙/)
+    const metrics = (await waitForFile(path.join(home, 'personas', 'tester', 'review', 'metrics.jsonl')))
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line))
+    const consolidate = metrics.find((item) => item.kind === 'consolidate')
+    assert.ok(consolidate, '整理轮必须留下一条 metric')
+    assert.equal(consolidate.status, 'written')
+    assert.equal(consolidate.from, 2)
+    assert.equal(consolidate.to, 2)
+  })
+})
+
 test('token usage reported by the stream lands in the metrics', async () => {
   await withTempHome(async (home) => {
     const host = fakeHost([{
