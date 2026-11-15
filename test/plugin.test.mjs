@@ -5,6 +5,7 @@ import path from 'node:path'
 import test from 'node:test'
 import { apply } from '../lib/memory.js'
 import { recallSummary, resetRecall } from '../lib/recall.js'
+import { readMetaSync } from '../lib/store.js'
 import { writeTopic } from '../lib/topics.js'
 
 /** Minimal Host stand-in: just the seams this plugin touches. */
@@ -221,6 +222,21 @@ test('recall injects once per turn and never into a rejected step', async () => 
     const rejected = { kind: 'reject' }
     const out = await handler({ agent, turn: 6, step: 1 }, async () => rejected)
     assert.equal(out, rejected)
+  })
+})
+
+test('a tool write keeps the entry metadata in step with the file', async () => {
+  await withTempHome(async () => {
+    const host = fakeHost()
+    apply(host.ctx, { personaId: 'tester' })
+    const tool = host.tools.get('memory')
+    const agent = { id: 'session-meta' }
+    fireCreated(host, agent)
+    await tick()
+    await tool.execute({ target: 'memory', operations: [{ action: 'add', content: '项目一律用 pnpm' }] }, { agent })
+    const meta = readMetaSync('tester')
+    const active = Object.values(meta.entries ?? {}).filter((record) => record.status === 'active')
+    assert.equal(active.length, 1, '工具写入后 meta 应当有这条的 active 记录')
   })
 })
 
