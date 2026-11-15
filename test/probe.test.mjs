@@ -26,6 +26,33 @@ test('the probe suite is version 2 and every question is classified', () => {
   assert.ok(suite.questions.some((item) => !item.holdout), '调参集不能为空')
 })
 
+test('no probe question is quoted inside the topic library', async () => {
+  const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-persona-probe-'))
+  const previous = process.env.DSH_HOME
+  process.env.DSH_HOME = home
+  try {
+    const topics = listTopicsSync('slot-1')
+    if (!topics.length) return // 干净环境（CI）没有主题库，这条只在有真实数据时生效
+    // Benchmark leakage: a topic that literally contains the question wins the
+    // ranking for that question and inflates the very score we are measuring.
+    // Writing eval notes into the live library did exactly that once (verify
+    // 100% → 80%), so the corpus is now checked on every run.
+    for (const item of suite.questions) {
+      const needle = item.q.slice(0, Math.min(12, item.q.length))
+      for (const topic of topics) {
+        assert.ok(
+          !`${topic.summary}\n${topic.body}`.includes(needle),
+          `主题「${topic.slug}」抄了题目原文（${needle}…），会造成评测泄漏`,
+        )
+      }
+    }
+  } finally {
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true })
+  }
+})
+
 test('every expected slug is a real topic of the persona the probe runs against', async () => {
   const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-persona-probe-'))
   const previous = process.env.DSH_HOME
