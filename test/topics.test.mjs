@@ -119,6 +119,28 @@ test('retrieval aliases survive a rewrite and stay out of the index line', async
   })
 })
 
+test('a slugless write reuses the topic it is about instead of minting a new one', async () => {
+  await withTempHome(async () => {
+    await writeTopic('slot-1', {
+      slug: '权限修复',
+      summary: 'ACL 留档与回滚',
+      content: 'acl-recovery 目录里有三份备份、回滚脚本与报告，权限修复时按它回滚。',
+    })
+    // Overflowing entries arrive without a slug; they must extend the subject that
+    // already exists instead of creating one topic per turn.
+    const again = await writeTopic('slot-1', {
+      content: 'acl-recovery 目录里的回滚脚本与报告要留档，权限修复回滚时按这三份来。',
+    })
+    assert.equal(again.ok, true)
+    assert.equal(again.slug, '权限修复')
+    assert.equal(listTopicsSync('slot-1').length, 1)
+
+    const unrelated = await writeTopic('slot-1', { content: '打印机墨盒芯片读不到时换一支新的即可。' })
+    assert.notEqual(unrelated.slug, '权限修复')
+    assert.equal(listTopicsSync('slot-1').length, 2)
+  })
+})
+
 test('overlap spots near-duplicate subjects', () => {
   assert.ok(overlap('打印机队列为空，需要重建', '打印机队列是空的，需要重建队列') > 0.5)
   assert.ok(overlap('打印机', '数据库迁移') < 0.3)
