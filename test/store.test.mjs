@@ -125,6 +125,8 @@ test('a near-duplicate add rewrites the existing entry instead of stacking up', 
   assert.equal(merged.entries.length, 1)
   assert.match(merged.entries[0], /pnpm/)
   assert.match(merged.mergedInto, /^[0-9a-f]{12}$/)
+  // The rewrite is reported, not silent: the caller shows what it replaced.
+  assert.match(merged.replacedText, /package-lock/)
 
   const fresh = applyOperation(existing, { action: 'add', content: '打印机墨盒芯片读不到时换墨盒即可' })
   assert.equal(fresh.ok, true)
@@ -148,10 +150,18 @@ test('a nearly full tier refuses new entries but still accepts rewrites and remo
   const full = [`${base.repeat(7)} ZETA`]
   assert.ok(full[0].length >= limit * 0.9)
 
-  const diverted = applyOperations(full, [{ action: 'add', content: '打印机墨盒读不到时换一支即可' }], limit)
+  const diverted = applyOperations(
+    full,
+    [{ action: 'add', content: '打印机墨盒读不到时换一支即可', topic: 'printer', summary: '墨盒读不到就换一支' }],
+    limit,
+  )
   assert.equal(diverted.ok, true)
   assert.equal(diverted.redirects.length, 1)
   assert.equal(diverted.entries.length, 1)
+  // The summary must survive the redirect: without it the index line is a bare
+  // slug, and the head carries 70% of the recall score.
+  assert.equal(diverted.redirects[0].summary, '墨盒读不到就换一支')
+  assert.equal(diverted.redirects[0].slugHint, 'printer')
 
   const refused = applyOperations(full, [{ action: 'add', content: '再来一条' }], limit, { addOverflow: 'reject' })
   assert.equal(refused.ok, false)

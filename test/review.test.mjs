@@ -28,12 +28,13 @@ function fakeHost(responseText) {
     llm: {
       stream(options) {
         calls.push(options)
-        const queued = Array.isArray(responseText) ? responseText.shift() : { text: responseText, finishReason: '' }
-        const item = queued ?? { text: '', finishReason: '' }
+        const queued = Array.isArray(responseText) ? responseText.shift() : { text: responseText, finishKind: 'stop' }
+        const item = queued ?? { text: '', finishKind: 'stop' }
         return (async function* generate() {
           yield { type: 'text-delta', text: item.text }
           if (item.usage) yield { type: 'usage', usage: item.usage }
-          yield { type: 'finish', finishReason: item.finishReason ?? '' }
+          // The Host's contract is `finish` with a FinishReason object, not a bare string.
+          yield { type: 'finish', reason: { kind: item.finishKind ?? 'stop' } }
         })()
       },
     },
@@ -277,7 +278,7 @@ test('a written turn leaves per-entry metadata and one metric line', async () =>
 test('a torn JSON tail is salvaged instead of losing the whole turn', async () => {
   await withTempHome(async (home) => {
     const torn = '{"ops":[{"target":"memory","action":"add","content":"第一条救回来的"},{"target":"memory","action":"add","content":"这条被截断'
-    const host = fakeHost([{ text: torn, finishReason: 'length' }])
+    const host = fakeHost([{ text: torn, finishKind: 'max-tokens' }])
     apply(host.ctx, { personaId: 'tester' })
     await feedTurn(host)
     await emit(host.listeners, 'agent/turn-stopping', { agent: { id: 'session-1' }, turn: 5 })
@@ -295,8 +296,8 @@ test('a torn JSON tail is salvaged instead of losing the whole turn', async () =
 test('a truncated output is retried once with a bigger budget', async () => {
   await withTempHome(async (home) => {
     const host = fakeHost([
-      { text: '{"ops":[{"target":"memory","action":"add","content":', finishReason: 'length' },
-      { text: '{"ops":[{"target":"memory","action":"add","content":"重试成功"}]}', finishReason: 'stop' },
+      { text: '{"ops":[{"target":"memory","action":"add","content":', finishKind: 'max-tokens' },
+      { text: '{"ops":[{"target":"memory","action":"add","content":"重试成功"}]}', finishKind: 'stop' },
     ])
     apply(host.ctx, { personaId: 'tester' })
     await feedTurn(host)
@@ -312,7 +313,7 @@ test('a truncated output is retried once with a bigger budget', async () => {
 
 test('an unparseable answer still leaves a metric line', async () => {
   await withTempHome(async (home) => {
-    const host = fakeHost([{ text: '这不是 JSON', finishReason: 'stop' }])
+    const host = fakeHost([{ text: '这不是 JSON', finishKind: 'stop' }])
     apply(host.ctx, { personaId: 'tester' })
     await feedTurn(host)
     await emit(host.listeners, 'agent/turn-stopping', { agent: { id: 'session-1' }, turn: 7 })
@@ -329,7 +330,7 @@ test('a full resident tier turns a review add into a topic instead of rejecting 
     await mkdir(dir, { recursive: true })
     await writeFile(path.join(dir, 'memory.md'), `<!-- dsh-persona v1 target=memory -->\n${'规则'.repeat(400)}\n`, 'utf8')
 
-    const host = fakeHost([{ text: JSON.stringify({ ops: [{ target: 'memory', action: 'add', content: '一条新规则' }] }), finishReason: 'stop' }])
+    const host = fakeHost([{ text: JSON.stringify({ ops: [{ target: 'memory', action: 'add', content: '一条新规则' }] }), finishKind: 'stop' }])
     apply(host.ctx, { personaId: 'tester', routeThreshold: 0.01 })
     await feedTurn(host)
     await emit(host.listeners, 'agent/turn-stopping', { agent: { id: 'session-1' }, turn: 9 })
@@ -347,7 +348,7 @@ test('a full resident tier turns a review add into a topic instead of rejecting 
 })
 test('a bare acknowledgement skips the review and says why', async () => {
   await withTempHome(async (home) => {
-    const host = fakeHost([{ text: '{"ops":[]}', finishReason: 'stop' }])
+    const host = fakeHost([{ text: '{"ops":[]}', finishKind: 'stop' }])
     apply(host.ctx, { personaId: 'tester' })
     await emit(host.listeners, 'session/event', { id: 'session-1' }, { type: 'user/message', message: { content: [{ type: 'text', text: '嗯' }] } })
     await emit(host.listeners, 'agent/turn-stopping', { agent: { id: 'session-1' }, turn: 11 })
@@ -363,8 +364,10 @@ test('token usage reported by the stream lands in the metrics', async () => {
   await withTempHome(async (home) => {
     const host = fakeHost([{
       text: '{"ops":[]}',
-      finishReason: 'stop',
-      usage: { input_tokens: 1200, output_tokens: 40, cache_read_input_tokens: 900 },
+      finishKind: 'stop',
+      // The Host's TokenUsage is camelCase — the old snake_case fixture is exactly
+      // why this test passed while every live metric read 0/0.
+      usage: { inputTokens: 1200, outputTokens: 40, cacheReadTokens: 900 },
     }])
     apply(host.ctx, { personaId: 'tester' })
     await feedTurn(host)
@@ -373,5 +376,21 @@ test('token usage reported by the stream lands in the metrics', async () => {
 
     const metrics = JSON.parse((await waitForFile(path.join(home, 'personas', 'tester', 'review', 'metrics.jsonl'))).trim().split('\n').pop())
     assert.deepEqual(metrics.tokens, { in: 1200, out: 40, cacheRead: 900 })
+    assert.equal(metrics.usageMissing, false)
+  })
+})
+
+test('a stream without a usage chunk says so instead of reporting zeros silently', async () => {
+  await withTempHome(async (home) => {
+    const host = fakeHost([{ text: '{"ops":[]}', finishKind: 'stop' }])
+    apply(host.ctx, { personaId: 'tester' })
+    await feedTurn(host)
+    await emit(host.listeners, 'agent/turn-stopping', { agent: { id: 'session-1' }, turn: 13 })
+    await tick()
+
+    const metrics = JSON.parse((await waitForFile(path.join(home, 'personas', 'tester', 'review', 'metrics.jsonl'))).trim().split('\n').pop())
+    assert.deepEqual(metrics.tokens, { in: 0, out: 0, cacheRead: 0 })
+    assert.equal(metrics.usageMissing, true)
+    assert.match(String(metrics.recall.outcome), /unknown|disabled/)
   })
 })

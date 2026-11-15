@@ -1,9 +1,22 @@
 # 变更日志
 
+## 0.8.4
+
+修 0.8.0 上线以来一直没发火的召回，以及三处会污染记忆的写入路径。
+
+- **召回真的注入了**：memory.js 的 pre-step 回调里，换行曾被写成字面量 \n，// 注释把「去重判断」和 const block = buildRecallBlock(...) 一起吞掉；下一行引用未声明的 block，每轮抛 ReferenceError 被空 catch 吃掉。现按 Host 契约重写：next() 返回 decision.kind === 'enter' 时，把块追加到 decision.messages 的最后一条用户消息，返回新的 decision（传入的消息不改写）。同一 payload 实测：0.8.3 注入 false / recallChars 0，本版注入 true / recallChars 60。
+- **召回不再沉默**：noteRecall 记录 outcome（injected / trivial / no-match / over-budget / skipped / unmatched-shape / error）、命中的 slug 与耗时；失败时 logger.warn 一次。metrics 增加 recall{}，同时保留 recallChars 兼容旧数据。
+- **token 计量按真实契约读**：DSH 的 TokenUsage 是 camelCase（inputTokens / outputTokens / cacheReadTokens），旧代码只认 snake_case，所以历史指标全是 0/0。现在两种都认；没有 usage 块时写 usageMissing: true，不再假装是 0。
+- **截断判定修好**：finish 块是 { reason: { kind } } 对象，旧代码 String() 成 [object Object]，截断重试从未触发。现在按 kind 判定（max-tokens 等）。
+- **转存不再丢摘要**：redirects 带上 summary 与 slugHint；writeTopic 收到空摘要时从正文首句派生（≤30 字），索引行不再只剩 slug。
+- **patch 防复述**：content 复述 old_text 前后原文时直接拒绝——此前会把整条写两遍（记忆整理时撞到两次）。
+- **相似覆盖可见**：add 命中相似条目时返回 replacedText，工具回执多一行「已合并覆盖旧条目：…」。
+- 测试 91 项（新增 7 项：pre-step 注入回归、一轮只注入一次、reject 不注入、patch 复述被拒、覆盖可见、空摘要兜底、redirect 带摘要）。
+
 ## 0.8.3
 
-- **token 与缓存计量**：collect() 现在捕获流里的 {type:'usage', usage} 块，metrics.jsonl 每条记录多一个 	okens: { in, out, cacheRead }（字段按 DSH 的 input_tokens / output_tokens / cache_read_input_tokens 读，缺失记 0）。
-- 跳过与失败路径同样带 	okens（全 0），指标形状统一。
+- **token 与缓存计量**：collect() 现在捕获流里的 {type:'usage', usage} 块，metrics.jsonl 每条记录多一个 tokens: { in, out, cacheRead }（字段按 DSH 的 input_tokens / output_tokens / cache_read_input_tokens 读，缺失记 0）。
+- 跳过与失败路径同样带 tokens（全 0），指标形状统一。
 - 测试 84 项（新增：流里带 usage 时指标如实记录）。
 
 ## 0.8.2
@@ -13,17 +26,17 @@
 
 ## 0.8.1
 
-- **复盘门控**：用户最后一句是「嗯/好/继续/收到/谢谢」或斜杠命令时，跳过复盘、不调模型，log 记 	rivial-turn、metrics 记 status: skipped / reason: trivial。
-- **指标补 ecallChars**：每轮召回块的实际字符数写进 metrics.jsonl，用来验证召回到底有没有发火、吃了多少预算。
+- **复盘门控**：用户最后一句是「嗯/好/继续/收到/谢谢」或斜杠命令时，跳过复盘、不调模型，log 记 trivial-turn、metrics 记 status: skipped / reason: trivial。
+- **指标补 ecallChars**：每轮召回块的实际字符数写进 metrics.jsonl，用来验证召回到底有没有发火、吃了多少预算。
 - 测试 83 项（新增：一句话寒暄不触发模型调用）。
 
 ## 0.8.0
 
 召回上线：细节不再只靠我猜着去读。
 
-- **lib/recall.js**：	okens / score / rankTopics / buildRecallBlock / isTrivialPrompt / applyRecall。关键词打分，索引行占 0.7、正文 0.3（与 probe 同一套公式）。
-- **gent/pre-step 钩子**：每轮取用户最后一条消息，对主题库打分，取前 3 篇拼成 ≤400 字符的块，追加到最后一条用户消息后面。块内写明「需要细节再按 slug 读 topics/<slug>.md」。
-- **三道保险**：ecallTopN: 0 一键关；零命中什么都不加；块已存在就跳过（一轮多个 step 只注入一次）；整段 try/catch，召回失败绝不影响本轮。
+- **lib/recall.js**：tokens / score / rankTopics / buildRecallBlock / isTrivialPrompt / applyRecall。关键词打分，索引行占 0.7、正文 0.3（与 probe 同一套公式）。
+- **agent/pre-step 钩子**：每轮取用户最后一条消息，对主题库打分，取前 3 篇拼成 ≤400 字符的块，追加到最后一条用户消息后面。块内写明「需要细节再按 slug 读 topics/<slug>.md」。
+- **三道保险**：ecallTopN: 0 一键关；零命中什么都不加；块已存在就跳过（一轮多个 step 只注入一次）；整段 try/catch，召回失败绝不影响本轮。
 - **门控**：空消息、斜杠命令、嗯/好/继续/收到/谢谢 之类直接跳过召回（Hermes 的 is_trivial_prompt）。
 - 实测：问「上次那个权限备份的文件夹现在能删吗」→ 召回块第一条正是 权限修复。
 - 测试 82 项（新增 recall 4 项：排序命中、门控、预算截断、注入三种消息形状）。
@@ -32,8 +45,8 @@
 
 主题库开始自己管卫生。
 
-- **主题 TTL**：	opicTtlDays（默认 90 天，0 关闭）。isTopicExpired() 按 updated 算到期日，拼索引与 /topics 默认列表都跳过过期项；GET /topics?show=expired 仍可查回——到期不删（mem0 的做法）。
-- **归档而非删除**：POST /topics/archive 把文件移到 	opics/archive/<slug>-<日期>.md，索引与列表都不再出现，内容仍可翻。
+- **主题 TTL**：topicTtlDays（默认 90 天，0 关闭）。isTopicExpired() 按 updated 算到期日，拼索引与 /topics 默认列表都跳过过期项；GET /topics?show=expired 仍可查回——到期不删（mem0 的做法）。
+- **归档而非删除**：POST /topics/archive 把文件移到 topics/archive/<slug>-<日期>.md，索引与列表都不再出现，内容仍可翻。
 - **面板**：主题行右侧「归档」，悬停才显形（11px、次要色、无边框），点一下变「确认归档 / 取消」，确认后立即从列表消失。
 - 测试 78 项（新增：过期判定的边界、ttlDays=0 关闭、归档后列表为空但文件仍在）。
 
@@ -41,9 +54,9 @@
 
 常驻层从「塞满的笔记本」变回「规则卡」。
 
-- **存量分流**：15 条 / 2965 字符（99%）→ **10 条 / 1535 字符（51%）**；被搬走的实现细节归入主题 记忆系统细节（转存规则、索引格式、失效链与 TTL、面板结构、两个踩过的坑）。原文备份在 	rash/2026-11-14-slot-1-memory-3033chars.md。
+- **存量分流**：15 条 / 2965 字符（99%）→ **10 条 / 1535 字符（51%）**；被搬走的实现细节归入主题 记忆系统细节（转存规则、索引格式、失效链与 TTL、面板结构、两个踩过的坑）。原文备份在 trash/2026-11-14-slot-1-memory-3033chars.md。
 - **索引按 updated 倒序**再截断：预算不够时，刚变过的主题优先可见（此前按文件名顺序，新主题可能被挤掉）。
-- 	opicsIndexLimit 默认 500 → 600：12 篇主题全部可见（567/600，不截断）。
+- topicsIndexLimit 默认 500 → 600：12 篇主题全部可见（567/600，不截断）。
 - 记忆里的旧路径事实已更新为 C:\work\DeepSeekHarness。
 
 ## 0.6.1
@@ -51,16 +64,16 @@
 补上 0.6.0 交代的两件事。
 
 - **面板能看到「这条为什么没了」**：记忆页在「主题 N 个」下面多一条「已失效 N 条」，展开是一张墓碑账本——左侧状态词（失效 / 删除 / 到期）、中间是条目原文预览（宋体，超出省略）、右侧是日期（等宽右对齐）；点任意一行看详情：记录 hash、失效时间、到期日、被哪个 hash 顶替。版式沿用档案柜：细线分隔、无卡片、无彩色胶囊，只有「到期」用琥珀色。
-- **过滤逻辑变成可测单元**：isibleEntries() 移到 store.js 导出，memory.js 改为调用它；新增用例断言「过期的与被推翻的都不再注入，但仍留在文件里，且 meta 缺失时一律放行」。
+- **过滤逻辑变成可测单元**：visibleEntries() 移到 store.js 导出，memory.js 改为调用它；新增用例断言「过期的与被推翻的都不再注入，但仍留在文件里，且 meta 缺失时一律放行」。
 - 测试 77 项。
 
 ## 0.6.0
 
 遗忘第一次真正生效：**被推翻的留档，到期的过滤**。
 
-- **失效链接线**：patch 与近重复合并都会产出「老 hash → 新 hash」，由复盘传给 efreshMeta，旧条目记为 status: 'superseded' + invalidAt + supersededBy；删掉的记为 emoved + invalidAt。历史不再随改写消失。
+- **失效链接线**：patch 与近重复合并都会产出「老 hash → 新 hash」，由复盘传给 efreshMeta，旧条目记为 status: 'superseded' + invalidAt + supersededBy；删掉的记为 emoved + invalidAt。历史不再随改写消失。
 - **读侧过滤**（mem0 的做法）：拼提示词时跳过 status != active 或 expiresAt < 今天 的条目——到期不删，只是不再注入。
-- **TTL**：	tlDays（默认 { memory: 180 }，user 不过期）给新条目写 expiresAt（日期粒度）；按 graphiti 的语义，「软期限」用 expiresAt，「事实被推翻」用 invalidAt，两者分开。
+- **TTL**：ttlDays（默认 { memory: 180 }，user 不过期）给新条目写 expiresAt（日期粒度）；按 graphiti 的语义，「软期限」用 expiresAt，「事实被推翻」用 invalidAt，两者分开。
 - **查看入口**：GET /memory/history?id= 列出 superseded / removed / expired；&show=all 看全部。meta 记录带 preview（前 80 字），不用翻文件就知道是哪条。
 - 测试 76 项（新增：失效链 + history 两种视图）。
 
@@ -71,30 +84,30 @@
 主题索引瘦身——修的是「主题存在但提示词里看不见」：
 
 - 索引行不再带绝对路径：目录提到段首声明一次，每行只留 slug｜摘要(≤30 字)。实测 9 个主题从「只显示 3 个」变成**全部显示（425 字符，不截断）**。
-- 默认 	opicsIndexLimit 350 → 500（常驻 74% 有余量，换来索引容量）。
+- 默认 topicsIndexLimit 350 → 500（常驻 74% 有余量，换来索引容量）。
 - 做法参考 basic-memory 的 OpenClaw context engine：预算按上下文类型分档（主 1200 / 子代理 800 字符），溢出时**显式标注截断**而不是静默丢；我们保留了末尾「另有 N 个主题未列出」。
 
 ## 0.5.3
 
 常驻写满不再拒绝：容量问题由系统自己消化。
 
-- pplyOperations 超阈值时不再返回 locked，而是把该条收进 edirects 交给调用方；常驻照旧写入其余 ops。options.addOverflow: 'reject' 可退回 0.5.2 的拒写行为。
-- memory 工具与复盘都把 edirects 落成主题（writeTopic，slug 优先用模型给的 	opic，否则 utoSlug(content) 取去标点前 12 字），回执写明「已转存主题「X」（常驻已满）」。
-- 复盘审计记 pplied: [{ target: 'topic', redirected: true }]，metrics.jsonl 新增 edirected 计数。
+- applyOperations 超阈值时不再返回 blocked，而是把该条收进 edirects 交给调用方；常驻照旧写入其余 ops。options.addOverflow: 'reject' 可退回 0.5.2 的拒写行为。
+- memory 工具与复盘都把 edirects 落成主题（writeTopic，slug 优先用模型给的 topic，否则 autoSlug(content) 取去标点前 12 字），回执写明「已转存主题「X」（常驻已满）」。
+- 复盘审计记 applied: [{ target: 'topic', redirected: true }]，metrics.jsonl 新增 edirected 计数。
 - 现在真正会拒绝的只剩：内容为空 / 不可见字符 / 疑似密钥、patch-remove 定不到条目、主题单篇超 4000 字符、patch 撑破常驻绝对上限。
 - 面板页脚文案改为「常驻已满 · 新增转存主题」。
-- 测试 75 项全过（阈值用例改为断言转存与 ddOverflow:'reject' 两条路径）。
+- 测试 75 项全过（阈值用例改为断言转存与 addOverflow:'reject' 两条路径）。
 
 ## 0.5.2
 
 软约束变成硬闸门：常驻层写满就**拒绝 add**，把压力推向主题库。
 
-- pplyOperations 新增 outeThreshold（默认 0.9）：某一档用量 ≥ 阈值时，纯**新增**被判 locked: 'threshold' 并回显「改用 patch 合并，或写 topic」。
-- **不误伤**：patch、emove、近重复合并（相似度 ≥0.8 的 add）、	arget=topic 全部照常；阈值设 0 即退回旧行为。
-- 调用方（memory 工具、复盘）都从配置读阈值，cordis.patch.yml 默认写入 outeThreshold: 0.9；复盘提示词同步预告「≥90% 会被系统拒绝」。
-- 被拒可观测：审计记 eason: 'threshold'，metrics.jsonl 加 locked 计数；**整轮全被拒也写一条 metrics**（此前 pplied 为空就不写，正是它掩盖了连续失败）。
+- applyOperations 新增 outeThreshold（默认 0.9）：某一档用量 ≥ 阈值时，纯**新增**被判 blocked: 'threshold' 并回显「改用 patch 合并，或写 topic」。
+- **不误伤**：patch、emove、近重复合并（相似度 ≥0.8 的 add）、target=topic 全部照常；阈值设 0 即退回旧行为。
+- 调用方（memory 工具、复盘）都从配置读阈值，cordis.patch.yml 默认写入 outeThreshold: 0.9；复盘提示词同步预告「≥90% 会被系统拒绝」。
+- 被拒可观测：审计记 eason: 'threshold'，metrics.jsonl 加 blocked 计数；**整轮全被拒也写一条 metrics**（此前 applied 为空就不写，正是它掩盖了连续失败）。
 - 面板页脚：该档 ≥90% 时在「记 N 条 · 主题 M」后显示 常驻已满 · 新增会被拒（11.5px 琥珀色，无背景）。
-- 现状收拾：常驻 2861 字符（95%）已去重压缩到 **2229 字符（74%，11 条）**，原文备份在 	rash/2026-11-13-slot-1-memory-2861chars.md。压缩时发现 patch 曾把旧文重复拼接进同一条，已一并清理。
+- 现状收拾：常驻 2861 字符（95%）已去重压缩到 **2229 字符（74%，11 条）**，原文备份在 trash/2026-11-13-slot-1-memory-2861chars.md。压缩时发现 patch 曾把旧文重复拼接进同一条，已一并清理。
 - 测试 75 项（新增：阈值拒绝、近重复放行、patch/remove 放行、阈值可关、复盘被拒记 metrics）。
 
 ## 0.5.1
@@ -109,11 +122,11 @@
 修的是「写入管道漏了」：11-09 与 11-12 两次复盘 parse-failed，整批改动被丢，五天里记忆一条没更新。
 
 - **三级容错解析**：严格 JSON → 修复后重试（转义裸换行、去尾逗号、补全括号）→ 逐对象抢救（只保留括号配平完整的 op，丢掉被截断的尾巴）。救回时审计记 salvaged/dropped。
-- **截断自动重试一次**：inishReason 命中 length/max_tokens 时，用双倍 maxTokens 重跑，并提示「只输出 ops、content ≤300 字」。
+- **截断自动重试一次**：finishReason 命中 length/max_tokens 时，用双倍 maxTokens 重跑，并提示「只输出 ops、content ≤300 字」。
 - **截断时不走"修复"**：修复会把半句话补成合法 JSON 并当真写入；现在截断一律走抢救，宁可少一条，不写残缺记忆。
-- **输出瘦身**：	opic/summary 只在 target=topic 时出现；content 建议 ≤400 字；maxTokens 默认 1200 → 2000。
+- **输出瘦身**：topic/summary 只在 target=topic 时出现；content 建议 ≤400 字；maxTokens 默认 1200 → 2000。
 - **失败也记 metrics**：metrics.jsonl 每轮一条（含 status/reason/salvaged/truncated/retried），连续失败一眼可见，不用翻日志。
-- **memory 工具可写主题**：	arget=topic + 	opic/summary，写入门槛同主题库（4000 字符上限、内容扫描）。
+- **memory 工具可写主题**：target=topic + topic/summary，写入门槛同主题库（4000 字符上限、内容扫描）。
 - **新增 POST /topics、GET /memory/stats**：stats 返回常驻用量、主题数量与漂移修复结果（manifest 缺失或条目数不符即重建）。
 - **强制路由**：常驻 memory ≥85% 时，提示词要求细节只能写 topic，不许 add 到 memory。
 - 测试 73 项（新增：抢救、截断重试、散文输出判失败、失败 metrics、主题写入 + 统计漂移）。
@@ -123,14 +136,14 @@
 - **新增「角色」标签页**：注册 conversation.view 的 persona 视图（order 20），排在「轨迹」之后。点它直接打开**当前会话所属角色**的面板，不用再去侧栏找。
 - 面板新增一行绑定说明（会话工作区 <路径>，11px 等宽、次要色），回答「为什么是这个角色」；未绑定时提示「记忆落在未认领池」。
 - Panel 支持 personaId 预选：解析结果到达后自动切到对应角色并停「角色记忆」页。
-- 新增 GET /resolve?session=：从 storages/session_projcache/sessions/<id>.json 的 ecord.identity.cwd 取会话工作区，再走同一套最长前缀归属；会话 id 做白名单校验（防路径穿越）。
+- 新增 GET /resolve?session=：从 storages/session_projcache/sessions/<id>.json 的 ecord.identity.cwd 取会话工作区，再走同一套最长前缀归属；会话 id 做白名单校验（防路径穿越）。
 - 新增测试：会话 id → 角色解析、非法 id 返回 null。69 项测试。
 
 ## 0.4.4
 
 第一条**真实**问题（"上次那个权限备份的文件夹现在能删吗"）暴露出两件事，一起修了：
 
-- **打分应跟随索引行**：probe 原来把 slug+summary+正文当一个词袋，长正文会稀释标题；而提示词里模型只看得到 slug+summary。现在改成  .7 × 索引行 + 0.3 × 正文——更接近模型实际看到的信号。
+- **打分应跟随索引行**：probe 原来把 slug+summary+正文当一个词袋，长正文会稀释标题；而提示词里模型只看得到 slug+summary。现在改成 0.7 × 索引行 + 0.3 × 正文——更接近模型实际看到的信号。
 - **摘要要能收敛主题**：新增的权限主题原摘要带「能不能删」，把所有「X 能不能删」都吸了过去（dsh-runtimes 能不能删 反而被抢走）。摘要改为「ACL 备份与回滚：11-06 权限修复留下的三份留档」后职责清晰。
 - 用真实问题替换了一条占位题，当前 12 条里 6 条来自真实/历史提问。
 

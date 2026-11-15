@@ -7,6 +7,7 @@ import { mkdir } from 'node:fs/promises'
 import {
   TOPIC_MAX_CHARS,
   archiveTopic,
+  deriveSummary,
   isTopicExpired,
   listTopicsSync,
   overlap,
@@ -76,6 +77,24 @@ test('the prompt index lists slug, summary and path within budget', async () => 
 
     const tight = renderTopicIndex(topics, 40)
     assert.match(tight, /未列出|alpha|beta/)
+  })
+})
+
+test('a topic written without a summary derives one from its first sentence', async () => {
+  await withTempHome(async () => {
+    const written = await writeTopic('slot-1', {
+      slug: 'no-summary',
+      content: '## 2026-11-14\n\n转存路径丢了摘要，索引行只剩 slug。后面这句不该进摘要。',
+    })
+    assert.equal(written.ok, true)
+    const topic = listTopicsSync('slot-1').find((item) => item.slug === 'no-summary')
+    assert.match(topic.summary, /转存路径丢了摘要/)
+    assert.ok(!topic.summary.includes('后面这句'))
+    assert.ok(topic.summary.length <= 30)
+
+    await writeTopic('slot-1', { slug: 'explicit', summary: '显式摘要', content: '正文随便写。' })
+    assert.equal(listTopicsSync('slot-1').find((item) => item.slug === 'explicit').summary, '显式摘要')
+    assert.equal(deriveSummary(''), '')
   })
 })
 

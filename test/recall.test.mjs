@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { applyRecall, buildRecallBlock, isTrivialPrompt, rankTopics } from '../lib/recall.js'
+import { injectRecall, isTrivialPrompt, rankTopics, buildRecallBlock, selectTopics } from '../lib/recall.js'
 
 const topics = [
   { slug: 'github-token', summary: '换 GitHub token 的三步与导入脚本', body: 'token 存在 keyring，代理不通时走 REST API。' },
@@ -32,15 +32,35 @@ test('the recall block respects its budget and keeps the header', () => {
   assert.equal(buildRecallBlock('清理脚本都清哪些目录', topics, { topN: 0 }), '')
 })
 
-test('applyRecall appends to the last user message in every supported shape', () => {
-  const plain = { messages: [{ role: 'user', content: '问题' }] }
-  assert.equal(applyRecall(plain, 'RECALL'), true)
-  assert.equal(plain.messages[0].content, '问题\n\nRECALL')
+test('selectTopics says why it produced nothing', () => {
+  assert.equal(selectTopics('嗯', topics).reason, 'trivial')
+  assert.equal(selectTopics('Kubernetes sidecar 怎么写', topics).reason, 'no-match')
+  assert.equal(selectTopics('清理脚本都清哪些目录', topics, { topN: 0 }).reason, 'disabled')
+  assert.equal(selectTopics('清理脚本都清哪些目录', topics, { budget: 10 }).reason, 'over-budget')
+  const picked = selectTopics('清理脚本都清哪些目录', topics)
+  assert.equal(picked.reason, 'matched')
+  assert.equal(picked.picks[0], '磁盘与清理')
+})
 
-  const blocks = { messages: [{ role: 'assistant', content: 'a' }, { role: 'user', content: [{ type: 'text', text: '问题' }] }] }
-  assert.equal(applyRecall(blocks, 'RECALL'), true)
-  assert.deepEqual(blocks.messages[1].content.at(-1), { type: 'text', text: 'RECALL' })
+test('injectRecall appends to the last user message and leaves the input alone', () => {
+  const messages = [
+    { role: 'assistant', content: 'a' },
+    { role: 'user', content: '问题' },
+  ]
+  const result = injectRecall(messages, 'RECALL')
+  assert.equal(result.injected, true)
+  assert.equal(result.chars, 6)
+  assert.equal(result.messages[1].content, '问题\n\nRECALL')
+  // The Host marks messages readonly; we must not rely on mutating them.
+  assert.equal(messages[1].content, '问题')
+  assert.equal(result.messages[0], messages[0])
 
-  assert.equal(applyRecall({}, 'RECALL'), false)
-  assert.equal(applyRecall({ messages: [{ role: 'assistant', content: 'a' }] }, 'RECALL'), false)
+  const blocks = [{ role: 'user', content: [{ type: 'text', text: '问题' }] }]
+  const second = injectRecall(blocks, 'RECALL')
+  assert.equal(second.injected, true)
+  assert.deepEqual(second.messages[0].content.at(-1), { type: 'text', text: 'RECALL' })
+
+  assert.equal(injectRecall([], 'RECALL').injected, false)
+  assert.equal(injectRecall([{ role: 'assistant', content: 'a' }], 'RECALL').injected, false)
+  assert.equal(injectRecall(second.messages, 'RECALL').injected, false, '同一个块不会叠加两次')
 })
