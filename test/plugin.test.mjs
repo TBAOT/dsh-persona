@@ -138,7 +138,14 @@ test('over-limit write is refused and reports the current entries', async () => 
     await tick()
 
     const result = await tool.execute(
-      { target: 'user', operations: [{ action: 'add', content: 'x'.repeat(200) }] },
+      // Two entries that each fit the 120-character rule but together blow the tier.
+      {
+        target: 'user',
+        operations: [
+          { action: 'add', content: 'x'.repeat(100) },
+          { action: 'add', content: 'y'.repeat(100) },
+        ],
+      },
       { agent },
     )
     assert.equal(result.ok, false)

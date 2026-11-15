@@ -196,7 +196,7 @@ test('over-limit edits are rejected per target and recorded', async () => {
 
     const log = await readFile(path.join(home, 'personas', 'tester', 'review', 'log.jsonl'), 'utf8')
     assert.match(log, /"rejected"/)
-    assert.match(log, /超出上限/)
+    assert.match(log, /上限/)
     assert.match(log, /"status":"rejected"/)
   })
 })

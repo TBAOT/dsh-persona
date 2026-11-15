@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   applyOperation,
   applyOperations,
+  applyRethink,
   withPersonaLock,
   entryHash,
   visibleEntries,
@@ -118,6 +119,44 @@ test('totalChars accounts for separators', () => {
   assert.equal(totalChars(['ab', 'cd']), 4 + '\n§\n'.length)
 })
 
+test('a resident entry is one fact, so an add over 120 characters is refused with a hint', () => {
+  const long = '这是一条很长的正文，把过程、命令、参数和对照数据全塞进常驻条目里，导致索引层被正文占满。'.repeat(3)
+  const result = applyOperation([], { action: 'add', content: long })
+  assert.equal(result.ok, false)
+  assert.match(result.error, /120 字上限/)
+  assert.match(result.error, /topic/)
+})
+
+test('a patch is how a legacy long entry gets shorter, so it is not capped', () => {
+  const legacy = `前缀标记${'旧'.repeat(200)}`
+  const shorter = applyOperation([legacy], { action: 'patch', old_text: '前缀标记', content: '简称' })
+  assert.equal(shorter.ok, true)
+  assert.ok(shorter.entries[0].length < legacy.length)
+})
+
+test('rethink replaces the whole tier, with guards against a sweep', () => {
+  const tier = ['一条事实甲', '一条事实乙', '一条事实丙', '一条事实丁']
+  const ok = applyRethink(tier, '合并后的事实甲\n合并后的事实乙\n合并后的事实丙', 3000)
+  assert.equal(ok.ok, true)
+  assert.equal(ok.entries.length, 3)
+  assert.equal(ok.rethought, true)
+
+  // Dropping more than a third of the facts is refused outright.
+  const sweep = applyRethink(tier, '只剩一条', 3000)
+  assert.equal(sweep.ok, false)
+  assert.match(sweep.error, /2\/3/)
+
+  const duplicated = applyRethink(tier, '甲\n甲\n乙\n丙', 3000)
+  assert.equal(duplicated.ok, false)
+
+  const overlong = applyRethink(tier, `${'长'.repeat(140)}\n乙\n丙`, 3000)
+  assert.equal(overlong.ok, false)
+
+  const tooBig = applyRethink(tier, `${'甲'.repeat(60)}\n${'乙'.repeat(60)}\n${'丙'.repeat(60)}`, 100)
+  assert.equal(tooBig.ok, false)
+  assert.match(tooBig.error, /超上限/)
+})
+
 test('a near-duplicate add rewrites the existing entry instead of stacking up', () => {
   const existing = ['项目一律用 pnpm，不生成 package-lock.json']
   const merged = applyOperation(existing, { action: 'add', content: '项目一律用 pnpm，不生成 package-lock.json 文件' })
@@ -167,9 +206,13 @@ test('a nearly full tier refuses new entries but still accepts rewrites and remo
   assert.equal(refused.ok, false)
   assert.equal(refused.blocked, 'threshold')
 
-  const merged = applyOperations(full, [{ action: 'add', content: `${base.repeat(7)}。` }], limit)
-  assert.equal(merged.ok, true)
+  // A near-duplicate add is a rewrite, and a rewrite is never routed away by the
+  // threshold — that is how a full tier gets smaller instead of spawning topics.
+  const twinTier = ['项目约定一律用 pnpm 安装依赖并且不生成锁文件；'.repeat(3)]
+  const merged = applyOperations(twinTier, [{ action: 'add', content: '项目约定一律用 pnpm 安装依赖并且不生成锁文件' }], limit)
+  assert.equal(merged.ok, true, merged.error)
   assert.equal(merged.entries.length, 1)
+  assert.equal(merged.redirects.length, 0)
 
   const patched = applyOperations(full, [{ action: 'patch', old_text: 'ZETA', content: 'ZETA（严格）' }], limit)
   assert.equal(patched.ok, true)
