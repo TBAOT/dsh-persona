@@ -31,7 +31,8 @@
     "scripts/health.mjs",
     "test/probe",
     "LICENSE",
-    "scripts/audit.mjs"
+    "scripts/audit.mjs",
+    "scripts/split-resident.mjs"
   ],
   "scripts": {
     "test": "node --test",
@@ -39,7 +40,8 @@
     "probe": "node scripts/probe.mjs",
     "health": "node scripts/health.mjs",
     "verify": "node --test && node scripts/check-patch.mjs",
-    "audit": "node scripts/audit.mjs"
+    "audit": "node scripts/audit.mjs",
+    "split-resident": "node scripts/split-resident.mjs"
   },
   "engines": {
     "dsh": ">=0.2.1-rc.2 <0.3.0",
