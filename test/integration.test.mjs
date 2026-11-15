@@ -103,6 +103,12 @@ test('a turn injects recall and the review records it as injected', async () => 
     const out = await emit(host.listeners, 'agent/pre-step', { agent, turn, step: 1 }, async () => decision)
     assert.equal(out[0].messages[0].content.includes('可能相关的主题'), true, '召回块必须进到这一轮的消息里')
 
+    // A real turn runs several steps. Step 2 correctly skips — and used to overwrite
+    // step 1's record, turning a healthy turn into `skipped` (seen live after 0.10.4).
+    const later = { kind: 'enter', messages: out[0].messages }
+    const second = await emit(host.listeners, 'agent/pre-step', { agent, turn, step: 2 }, async () => later)
+    assert.equal(second[0], later, '第二步不该再注入，也不该改写消息')
+
     await emit(host.listeners, 'session/event', { id: 'session-e2e' }, {
       type: 'user/message',
       message: { content: [{ type: 'text', text: '清理脚本都清哪些目录' }] },
