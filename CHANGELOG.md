@@ -1,5 +1,14 @@
 # 变更日志
 
+## 0.10.2
+
+把页脚那格「召回 N 篇」的措辞变成可测的读模型。
+
+- **`lib/client/recall-readout.js`**：`recallReadout(summary)` 返回 `{label, title, tone}`——`召回 3 篇 / 171 字符`、`召回 —`、异常时 `tone: 'warn'`；每种 outcome 都有中文说明（`注入形状不符，没落地` 之类），tooltip 里带时间、轮次、耗时与注入的 slug。
+- **`GET /health` 直接返回 `readout`**：面板不再自己拼文案，`pnpm health` 与面板对同一轮的说法不会再分叉；测试 4 条覆盖注入、无命中、只对 broken/silent 报警、未记录。
+- **首次推送成功**：远端 `main` 从 `b787614` 追到 `e3fcd5b`，tag v0.8.4–v0.10.1 全部推上；CI run #34 已跑起。
+- 测试 117 项。
+
 ## 0.10.1
 
 `pnpm audit`：记忆库的结构性体检。

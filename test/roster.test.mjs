@@ -214,6 +214,8 @@ test('health reports the last recall record for one persona', async () => {
     assert.equal(result.body.injected, 1)
     assert.equal(result.body.last.recall.outcome, 'injected')
     assert.equal(result.body.last.recall.chars, 171)
+    // The panel renders this read model instead of re-deriving the wording.
+    assert.equal(result.body.readout.label, '召回 1 篇 / 171 字符')
   })
 })
 
