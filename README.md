@@ -177,6 +177,19 @@ node scripts/migrate-soul-md.mjs --persona slot-1 \
 - 2026-11-15 基线（slot-1，14 题）：tune 89%（8/9）、verify 100%（5/5）、平均注入 177 字符。
 - 已知局限：很长很口语的问题会把分数稀释（覆盖率按查询长度归一），这类查询仍可能漏。
 
+## 体检
+
+`pnpm health` 读每个角色最近的 `review/metrics.jsonl`，一条命令回答「召回现在有没有在跑」：
+
+```
+[slot-1] 近 5 轮：注入 3 次（injected×3 no-match×2）
+   tokens in/out：4976/1344
+   最近：turn 9 @ 2026-11-15T10:03:39+08:00 → ok
+```
+
+判定 `ok` / `broken`（形状或异常失败）/ `silent`（该注入却一次没注入）/ `unverified`（每条都记成 unknown，
+无法归属轮次）/ `stale`（最近没活动）。只有 `broken` 与 `silent` 退出码非零。
+
 ## 隐私
 
 - 记忆是本地明文文件，不会上传到任何地方。

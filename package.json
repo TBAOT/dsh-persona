@@ -1,6 +1,6 @@
 {
   "name": "dsh-persona",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "description": "Multi-persona memory for DeepSeek Harness: two-tier persona memory (user profile + agent notes) with per-turn review. 多个角色各自独立的长期记忆。",
   "type": "module",
   "main": "lib/memory.js",
@@ -28,6 +28,7 @@
     "scripts/migrate-soul-md.mjs",
     "scripts/split-memory.mjs",
     "scripts/probe.mjs",
+    "scripts/health.mjs",
     "test/probe",
     "LICENSE"
   ],
@@ -35,6 +36,7 @@
     "test": "node --test",
     "check": "node scripts/check-patch.mjs",
     "probe": "node scripts/probe.mjs",
+    "health": "node scripts/health.mjs",
     "verify": "node --test && node scripts/check-patch.mjs"
   },
   "engines": {

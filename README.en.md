@@ -100,6 +100,21 @@ A sidebar entry named "角色" opens the panel:
   borderline holdout question (13/14 vs 12/14), so aliases are deliberately left
   out of the frequency count.
 
+## Health check
+
+`pnpm health` reads each persona's recent `review/metrics.jsonl` and answers whether
+recall is actually running right now:
+
+```
+[slot-1] last 5 turns: injected 3 (injected×3 no-match×2)
+   tokens in/out: 4976/1344
+   newest: turn 9 @ 2026-11-15T10:03:39+08:00 → ok
+```
+
+Verdicts: `ok` / `broken` (shape or error failure) / `silent` (should have injected,
+never did) / `unverified` (every row says `unknown`, so it cannot be attributed to a
+turn) / `stale` (no recent activity). Only `broken` and `silent` exit non-zero.
+
 ## Privacy
 
 - Memory is local plain text; nothing is uploaded by the plugin itself.
