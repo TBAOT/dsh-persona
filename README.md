@@ -190,6 +190,17 @@ node scripts/migrate-soul-md.mjs --persona slot-1 \
 判定 `ok` / `broken`（形状或异常失败）/ `silent`（该注入却一次没注入）/ `unverified`（每条都记成 unknown，
 无法归属轮次）/ `stale`（最近没活动）。只有 `broken` 与 `silent` 退出码非零。
 
+## 升级后怎么确认生效
+
+插件的代码只有重载/重启后才进内存（本机 `link:` 安装时尤其如此），所以升级完按这三步验：
+
+1. `pnpm health`（或 `node scripts/health.mjs`）：看 verdict，`ok` 说明最近窗口里召回真注入了；
+2. 随便发一句话，再看 `<DSH_HOME>/personas/<角色>/review/metrics.jsonl` 最后一行：
+   - `recall.outcome` 应是 `injected` / `no-match` / `trivial` 之一，**不该是 `unknown`**；
+   - `recall.chars` 大于 0 表示这次确实把主题塞进了提示词；
+   - `tokens.in/out` 非零表示计量拿到了真实用量（`usageMissing: true` 则是流里没有 usage 块）。
+3. 若 verdict 是 `silent` 或 `broken`，先看同一行里的 `recall.error`，再去查 `lib/recall.js` 的注入路径。
+
 ## 隐私
 
 - 记忆是本地明文文件，不会上传到任何地方。

@@ -115,6 +115,20 @@ Verdicts: `ok` / `broken` (shape or error failure) / `silent` (should have injec
 never did) / `unverified` (every row says `unknown`, so it cannot be attributed to a
 turn) / `stale` (no recent activity). Only `broken` and `silent` exit non-zero.
 
+## Confirming an upgrade took effect
+
+Plugin code only enters memory after a reload or restart (especially when installed
+via `link:`), so verify in three steps:
+
+1. `pnpm health` — an `ok` verdict means recall did inject within the recent window;
+2. Send any message, then read the last line of `<DSH_HOME>/personas/<id>/review/metrics.jsonl`:
+   - `recall.outcome` should be `injected` / `no-match` / `trivial`, **never `unknown`**;
+   - `recall.chars > 0` means the topics really went into the prompt this turn;
+   - non-zero `tokens.in/out` means usage was captured (`usageMissing: true` means the
+     stream carried no usage chunk at all).
+3. A `silent` or `broken` verdict: read `recall.error` on that same line before
+   suspecting the injection path in `lib/recall.js`.
+
 ## Privacy
 
 - Memory is local plain text; nothing is uploaded by the plugin itself.
