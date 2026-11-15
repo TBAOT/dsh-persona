@@ -1,5 +1,14 @@
 # 变更日志
 
+## 0.9.6
+
+补上那个让召回死了九版的缝：**没有任何测试断言「这一轮的指标说它注入了」**。
+
+- **端到端回归**（`test/integration.test.mjs`）：同一个 fake Host 上同时装 memory 与 review 两半，跑一轮 `agent/pre-step` → `agent/turn-stopping`，断言落盘的 metric 里 `recall.outcome === 'injected'`、`recall.chars > 0`、`recall.topics` 含命中的主题、`recall.turn` 与轮次一致、`tokens` 用 camelCase 字段读到真实数字、`usageMissing === false`。
+- **反向用例**：`decision.kind === 'reject'` 的一步不得被记成注入。
+- 之前注入侧与复盘侧各有单测，但两侧之间没有一条断言，所以「probe 绿、单测绿、线上零」可以同时成立。
+- 测试 107 项。
+
 ## 0.9.5
 
 同一事实写进两个档，当场提示。
