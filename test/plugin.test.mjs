@@ -224,6 +224,26 @@ test('recall injects once per turn and never into a rejected step', async () => 
   })
 })
 
+test('the same fact landing in both tiers is flagged at write time', async () => {
+  await withTempHome(async () => {
+    const host = fakeHost()
+    apply(host.ctx, { personaId: 'tester' })
+    const tool = host.tools.get('memory')
+    const agent = { id: 'session-twin' }
+    fireCreated(host, agent)
+    await tick()
+
+    await tool.execute({ target: 'user', operations: [{ action: 'add', content: '项目一律用 pnpm 安装依赖，不生成锁文件' }] }, { agent })
+    const result = await tool.execute(
+      { target: 'memory', operations: [{ action: 'add', content: '项目一律用 pnpm 安装依赖，不生成锁文件（本机约定）' }] },
+      { agent },
+    )
+    assert.equal(result.ok, true)
+    assert.match(result.text, /已有相近条目/)
+    assert.match(result.text, /user 档/)
+  })
+})
+
 test('a patch that restates the surrounding entry is refused, not doubled', async () => {
   await withTempHome(async () => {
     const host = fakeHost()
