@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { injectRecall, isTrivialPrompt, rankTopics, buildRecallBlock, selectTopics } from '../lib/recall.js'
+import { injectRecall, isTrivialPrompt, noteRecall, rankTopics, recallSummary, resetRecall, buildRecallBlock, selectTopics } from '../lib/recall.js'
 
 const topics = [
   { slug: 'github-token', summary: '换 GitHub token 的三步与导入脚本', body: 'token 存在 keyring，代理不通时走 REST API。' },
@@ -58,6 +58,18 @@ test('selectTopics says why it produced nothing', () => {
   const picked = selectTopics('清理脚本都清哪些目录', topics)
   assert.equal(picked.reason, 'matched')
   assert.equal(picked.picks[0], '磁盘与清理')
+})
+
+test('a later step in the same turn does not overwrite the injection', () => {
+  resetRecall()
+  noteRecall({ outcome: 'injected', chars: 171, topics: ['磁盘与清理'], ms: 4, turn: 9 })
+  // Step 2 of the same turn correctly skips; it must not turn the turn's record into
+  // `skipped`, which is what live metrics showed right after 0.10.x shipped.
+  noteRecall({ outcome: 'skipped', chars: 0, topics: [], ms: 5, turn: 9 })
+  const record = recallSummary(9)
+  assert.equal(record.outcome, 'injected')
+  assert.equal(record.chars, 171)
+  resetRecall()
 })
 
 test('injectRecall appends to the last user message and leaves the input alone', () => {

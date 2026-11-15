@@ -1,5 +1,15 @@
 # 变更日志
 
+## 0.10.5
+
+重启后立刻暴露的指标缺陷：一轮里第二次 pre-step 把第一次的注入记录覆盖掉了。
+
+- **现象**：0.10.4 上线后每轮 `metrics.recall.outcome` 都是 `skipped`、`chars: 0`，`pnpm health` 判定 `silent`——但提示词里明明有召回块。
+- **根因**：`noteRecall` 按 turn 存记录，一轮有多个 step：第一步注入（`injected` 171 字符），第二步正确跳过（`skipped` 0 字符），后写覆盖前写，于是「工作正常的一轮」被记成「没注入」。
+- **修**：同一 turn 内已有 `chars > 0` 的记录时，不再被后续 0 字符的记录覆盖；`health` 把 `skipped` 视为「本轮已注入过」，不计入 silent。
+- 新增用例：同一 turn 两次 `noteRecall`，记录必须保持 `injected`。
+- 测试 119 项。
+
 ## 0.10.4
 
 `memory` 工具写完之后，meta 不再落后一条。
