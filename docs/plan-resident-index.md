@@ -1,85 +1,84 @@
 # 方案 A：常驻层改「索引句」，正文进主题库
 
-状态：**待用户批准**（未实施）。日期 2026-11-15，基线版本 0.10.6。
+状态：**待最终确认**（代码未动）。日期 2026-11-15，基线版本 0.10.6。
 
-## 1. 现状（实测，不是估计）
+## 0. 调研结论（三个待拍板问题已按 GitHub 实据改判）
+
+| 问题 | 实据 | 改判 |
+|---|---|---|
+| 条目该多长 | 没有项目按"每条 60–80 字"限制：Letta 的块上限是 `CORE_MEMORY_PERSONA_CHAR_LIMIT = 20000`、`CORE_MEMORY_HUMAN_CHAR_LIMIT = 20000`、`CORE_MEMORY_BLOCK_CHAR_LIMIT = 100000` 字符（[constants.py](https://github.com/letta-ai/letta/blob/archive/letta/constants.py)）；mem0 的提取提示要求每条是 **15–80 词的自包含陈述**（[prompts.py](https://github.com/mem0ai/mem0/blob/main/mem0/configs/prompts.py)）；generative agents 每个记忆节点是**一句话**的 observation/thought，另带 poignancy/keywords/embedding（[associative_memory.py](https://github.com/joonspk-research/generative-agents/blob/main/reverie/backend_server/persona/memory_structures/associative_memory.py)） | **不用 60 字**。取「一条一个事实、≤120 字、一句话」：3000 ÷ 120 ≈ 25 条，条件分支写得下 |
+| `rethink` 自动还是人工 | Letta 分了两套工具集：交互用的 `BASE_MEMORY_TOOLS_V2 = [memory_replace, memory_insert]`；`memory_rethink`、`memory_finish_edits` 只在 `BASE_SLEEPTIME_TOOLS` 里，源码注释："leaving these ones out to simply the set? Can have these reserved for sleep-time"（[constants.py](https://github.com/letta-ai/letta/blob/archive/letta/constants.py)、[base.py](https://github.com/letta-ai/letta/blob/archive/letta/functions/function_sets/base.py)） | **自动，但不进对话轮**：普通轮只许精确编辑（`add`/`patch`/`remove`）；整层重写放在**复盘之后的后台一轮**（Letta 的 sleep-time 对应物），校验不过整批放弃，绝不打断对话 |
+| 迁移范围 | — | **三个角色都迁**（slot-1 98%、slot-2 99%、slot-3 91%），每个角色单独 dry-run、单独备份 |
+
+同源补充：Letta 的压力不靠"拒绝"表达，而是上下文到 0.9 触发摘要（`SUMMARIZATION_TRIGGER_MULTIPLIER = 0.9`），并把"该存记忆了"作为系统提示插入对话（`MESSAGE_SUMMARY_WARNING_STR`）。我们的 0.9 转存阈值方向一致。
+
+## 1. 现状（实测）
 
 | 项 | 值 |
 |---|---|
 | `memory` 常驻 | 16 条 / **2952 / 3000 字符（98%）**，平均 185 字，最长 450 字 |
 | `user` 常驻 | 9 条 / 709 / 1375（53%），平均 79 字 |
 | 主题库 | 18 篇，平均约 1.3 KB |
-| 写入行为 | 常驻 ≥90% 时 `add` 不拒绝，转存到主题；**变长的 `patch` 仍会被 100% 硬检查拒绝** |
+| 写入行为 | 常驻 ≥90% 时 `add` 不拒绝、转存主题；**变长的 `patch` 仍被 100% 硬检查拒绝** |
 
-问题不在"预算太小"，而在**常驻层里混着正文**：一条 185 字的事实，把"结论"和"过程/细节"一起塞进索引位。压到 80% 只是把 16 条变成 13 条，几轮后又满——治症状。
+问题不是预算太小，而是**常驻层里混着正文**：一条 185 字把"结论"和"过程"一起塞进索引位。压到 80% 只是 16 条变 13 条，几轮又满。
 
 ## 2. 设计：三层各司其职
 
 | 层 | 放什么 | 形态 | 进提示词 |
 |---|---|---|---|
-| 常驻 `memory.md` | 结论、约定、判据、"下次该怎么办" | **每条 ≤60 字、单事实、可独立读懂** | 全量注入（冻结） |
-| `topics/*.md` | 过程、命令、对照数据、背景 | 正文，按 slug 检索 | 只放一行索引（slug｜摘要） |
+| 常驻 `memory.md` | 结论、约定、判据、"下次该怎么办" | **一条一个事实、≤120 字、一句话** | 全量注入（冻结） |
+| `topics/*.md` | 过程、命令、对照数据、背景 | 正文，按 slug 检索 | 只一行索引（slug｜摘要） |
 | 召回块 | 本轮相关主题指针 | 前 3 篇摘要 ≤400 字符 | 每轮注入 |
 
-**不做的**：不给每条加 `→ topics/xxx` 指针（每条多 20 字等于又把索引撑肥）；指针靠已有的主题索引与召回提供。
+不给每条加 `→ topics/xxx` 指针：每条多 20 字等于又把索引撑肥，指针由主题索引与召回提供。
 
-## 3. 容量换算（这就是收益）
+## 3. 容量换算
 
-- `memory` 3000 字 ÷ 60 字 ≈ **45 条**（现在 16 条）；
-- `user` 1375 字 ÷ 60 字 ≈ **20 条**（现在 9 条）；
-- 迁移后预估：`memory` ≈ 16 条索引句 ≈ 900–1100 字（**30–37%**），正文进 6–8 篇主题。
+- `memory` 3000 ÷ 120 ≈ **25 条**（现 16 条）；`user` 1375 ÷ 120 ≈ **11 条**（现 9 条，平均已 79 字）；
+- 迁移后预估：`memory` 16 条 × ~110 字 ≈ 1700 字（**57%**），比现在 98% 回到"再装 10 条"的空间；
+- 若某条实在压不下 120 字，正文进主题、常驻只留"判据 + 去哪看"。
 
 ## 4. 写入路径改造
 
-1. **新增操作 `rethink`**（借 Letta 的 `memory_rethink`）：`{ action: 'rethink', content: '<整层新文本，一条一行>' }`——整层重写，用于"合并 / 去重 / 压缩"。
-   - 校验：非空、每行 ≤60 字、行数 ≤ (limit/40)、总字符 ≤ limit、无完全重复；
-   - 写入前自动备份到 `~/.dsh/trash/<日期>-<persona>-<target>-<字符数>chars.md`；
-   - 不允许把条数从 N 降到 N/2 以下（防模型"大扫除"丢事实），触顶则拒绝并说明。
-2. **`add` / `patch` 加 60 字上限**（新写入；存量由迁移处理）。超长时返回明确指令：*"这条 120 字，请压成一句 ≤60 字的结论，过程写 topic"*，而不是静默截断。
-3. **满层的动作从"甩给主题"改成"要求 condense"**：
-   - 现在的行为（≥90% 直接把新事实丢进主题）保留为兜底；
-   - 但回执里追加 `needsRethink: true` 与"建议合并的相近条目"，让复盘模型下一轮用 `rethink` 消化；
-   - `addOverflow: 'reject'` 仍是可选硬拒绝。
-4. **复盘提示词**：条目必须是"结论句"，写过程/命令/数据一律进 topic；`patch` 只给替换片段（已有规则）。
+1. **普通轮只给精确编辑**：`add` / `patch` / `remove`（现状），新增 **≤120 字**单条上限；超长时回执明说"请压成一句话，过程写 topic"，不静默截断。
+2. **新增 `rethink`：只在后台轮里可用**（对应 Letta sleep-time）：
+   - 触发：复盘写完之后，若该档 ≥90%，起一轮"整理"调用，工具集只有 `rethink`；
+   - 形状：`{ action: 'rethink', content: '<整层新文本，一条一行>' }`；
+   - 校验：非空、每行 ≤120 字、无完全重复、总字符 ≤ 上限、**行数不得少于原来的 2/3**（防大扫除丢事实）、不许出现 `old_text` 之外的新事实类别（无法机检，靠备份兜）；
+   - 失败即整批放弃，回执写原因，不打断对话；成功则整层替换并 `refreshMeta` + 备份。
+3. **满层行为**：保留 ≥90% 的"转存主题"兜底，但回执追加 `needsRethink: true` 与"建议合并的相近条目"，让后台整理轮有的放矢。
+4. **复盘提示词**：条目写成结论句；过程/命令/数据一律 topic；`patch` 只给替换片段（已有规则）。
 
-## 5. 数据迁移（一次性，幂等）
+## 5. 数据迁移（一次性，幂等，三角色）
 
-新脚本 `scripts/split-resident.mjs`（由现有 `split-memory.mjs` 演进，复用它的"路由 + 备份 + 可重复执行"骨架）：
+新脚本 `scripts/split-resident.mjs`（由 `split-memory.mjs` 的"路由 + 备份 + 可重复执行"骨架演进）：
 
-1. 读 `memory.md` 的 16 条，逐条判定：**能压成 ≤60 字结论**的压，压不动的正文移入主题；
-2. 主题复用规则沿用 `writeTopic` 的 overlap ≥0.6（0.9.4 已实现），没有相近主题才新建；
-3. 每条迁移都写进 `~/.dsh/trash/<日期>-slot-1-memory-<字符数>chars.md`，脚本 `--dry-run` 先打印"哪条去哪、压成什么"；
-4. `refreshMeta` + `writeTopicManifest`，跑 `pnpm audit` 必须 0 错。
+1. `--dry-run`：逐条打印「原文 → 压成的一句话（≤120 字）→ 正文去哪个主题（复用 overlap≥0.6）」，等人过目；
+2. `--apply`：先备份 `~/.dsh/trash/<日期>-<persona>-<target>-<字符数>chars.md`，再写索引句 + 追加主题正文；重复执行不会二次切割（已 ≤120 字的条目原样跳过）；
+3. 收尾：`refreshMeta` + `writeTopicManifest` + `pnpm audit` 必须 0 错。
 
-预估产出：`memory` 16 → 16 条（长度 185 → 60），6–8 篇主题各增一段。
-
-## 6. 验收标准（可量化）
+## 6. 验收标准
 
 | 判据 | 目标 |
 |---|---|
-| `memory` 占用 | ≥1800 字（60%）下拉到 **≤1200 字（40%）** |
-| 条目数 | ≥ 16（不得因压缩丢事实） |
+| 三个角色的常驻占用 | 都 ≤70%（slot-1 98% → ~57%，slot-2 99%、slot-3 91% 同法） |
+| 条目数 | 每档不减（不得因压缩丢事实） |
 | `pnpm probe --split=tune/verify` | tune ≥89%、verify 100%（不得回退） |
-| `pnpm audit` | 0 个结构性错误 |
-| `pnpm verify` | 全绿（新增 `rethink` 与 60 字上限的用例） |
-| 现场 | 下一次 `add` 不再被转存（因为回落到 40%），工具回执显示常驻条数上升 |
+| `pnpm audit` | 三角色 0 个结构性错误 |
+| `pnpm verify` | 全绿（新增 `rethink` 校验、120 字上限、后台轮不越权的用例） |
 
 ## 7. 实施顺序与回滚
 
-1. **commit 1**：`rethink` 操作 + 60 字上限 + 测试（不动数据）；
-2. **commit 2**：迁移脚本 + `--dry-run` 输出评审（此时只打印，不落盘）；
-3. **commit 3**：`--apply` 迁移本地 `slot-1` 数据 + 跑 probe/audit 记录数字 + CHANGELOG（0.11.0）。
+1. **commit 1**：`rethink` 操作 + 120 字上限 + 校验 + 测试（不动数据、不接后台轮）；
+2. **commit 2**：后台整理轮接线（复盘后判定 ≥90% → 起一轮）+ 测试；
+3. **commit 3**：迁移脚本 `--dry-run` 输出贴给你看；
+4. **commit 4**：`--apply` 三角色迁移 + probe/audit 数字 + CHANGELOG（0.11.0）。
 
-回滚：迁移前原文在 `~/.dsh/trash`；代码回滚即 `git revert`。数据不做自动回写（保持一条命令可还原）。
+回滚：原文在 `~/.dsh/trash`；代码走 `git revert`；数据不自动回写。
 
 ## 8. 已知取舍
 
-- **索引句会丢上下文**：60 字装不下条件分支。对策：索引句只写"判据 + 去哪看"，细节必须落到同名主题；`audit` 增加一条检查——条目里出现"详见/见 topic"却指不到真实 slug 时报错。
-- **`rethink` 有误删风险**：靠"条数不得腰斩 + 备份 + 校验"兜，不寄望模型自律。
-- **召回仍是关键词**：本方案不动检索，probe 的 14 题结论保持有效；换成语义检索是另一个议题。
-
-## 9. 需要你拍板的三件事
-
-1. 条目上限取 **60 字**还是 **80 字**（60 更省，80 更能带条件）；
-2. `rethink` 是否允许**自动**执行（超阈值时模型可自行整层重写），还是必须你在面板上点一下；
-3. 迁移是否**只动 slot-1**（我倾向只动它，slot-2/3 仍 99% / 91%，等你另说）。
+- **120 字仍会丢条件分支**：靠"判据 + 去哪看"的写法补偿，`audit` 增加一条——条目里写"详见/见 topic"却指不到真实 slug 时报错。
+- **`rethink` 有误删风险**：靠"行数不得少于 2/3 + 备份 + 整批放弃"兜，不寄望模型自律。
+- **召回仍是关键词**：本方案不动检索，probe 的 14 题结论继续有效；语义检索是另一个议题。
