@@ -6,10 +6,11 @@
 
 | 项 | 值 |
 |---|---|
-| 本地 main | `0.9.7`，tag `v0.8.4` … `v0.9.7` |
-| 远端 | 仍停在 `b787614`（v0.8.3）——网络不通，未推送 |
+| 本地 main | `0.10.3`，tag `v0.8.4` … `v0.10.3` |
+| 远端 | 已推送：`main` 从 `b787614` 追到 `d8d38de`，所有新 tag 都在远端 |
+| CI | run #34（0.10.1）在 windows+node20 红过：集成测试清理临时目录 `ENOTEMPTY`（后台复盘还握着文件句柄），已用 `rm({maxRetries})` + 轮询 `waitForFile` 修掉，见 0.10.3 |
 | 安装方式 | 本机 profile bundle 是 `link:C:\A\work\优质项目\dsh-persona`，改代码后要重载/重启才生效 |
-| 测试 | 108 项（`pnpm verify`：`node --test` + 补丁结构检查） |
+| 测试 | 117 项（`pnpm verify`：`node --test` + 补丁结构检查） |
 
 ## 这一轮改了什么（0.8.4 → 0.9.7）
 
