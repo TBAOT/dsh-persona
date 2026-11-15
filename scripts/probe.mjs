@@ -1,99 +1,133 @@
 /**
  * Topic-recall probe.
  *
- * Measures one narrow thing: given a question a human would actually type, does
- * keyword scoring land on the topic file that holds the answer? It does not
- * measure whether the model then reads that file — that is observed in real
- * sessions, not simulated here.
+ * Measures one narrow thing: given a question a human actually typed, does the
+ * live scorer put the answering topic at rank 1? It does not measure whether the
+ * model then opens the file — that is observed in real sessions.
  *
- *   node scripts/probe.mjs                 # all personas with topics
- *   node scripts/probe.mjs --persona slot-1
+ * The scoring is imported from lib/recall.js, so "what the probe reports" and
+ * "what the turn actually does" cannot drift apart; the earlier copy-in-place
+ * scorer is why the probe could stay green while the live path was dead.
+ *
+ * Three numbers are always reported together, because any single one is easy to
+ * game: hit rate, injected characters (the prompt cost of the block) and scoring
+ * latency.
+ *
+ *   node scripts/probe.mjs                          # every persona with topics
+ *   node scripts/probe.mjs --persona=slot-1
+ *   node scripts/probe.mjs --persona=slot-1 --split=verify
  */
 import { readFileSync } from 'node:fs'
-import path from 'node:path'
 import os from 'node:os'
+import path from 'node:path'
 import { listTopicsSync } from '../lib/topics.js'
-// NOTE: scoring here mirrors lib/recall.js on purpose — the probe must be able to\n// run (and fail) independently of the live path it measures.
+import { rankTopics, selectTopics } from '../lib/recall.js'
 
 const DSH_HOME = process.env.DSH_HOME || path.join(os.homedir(), '.dsh')
-const personaArg = process.argv.find((arg) => arg.startsWith('--persona='))?.split('=')[1]
+const arg = (name) => process.argv.find((item) => item.startsWith(`--${name}=`))?.split('=')[1]
+const personaArg = arg('persona')
+const split = arg('split') ?? 'all'
+const budget = Number(arg('budget') ?? 400)
+const topN = Number(arg('topN') ?? 3)
 
-/** Question and document are compared as token sets; CJK uses 2-grams. */
-export function tokens(text) {
-  const set = new Set()
-  for (const word of String(text ?? '')
-    .toLowerCase()
-    .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, ' ')
-    .split(/\s+/)
-    .filter(Boolean)) {
-    if (/^[a-z0-9]+$/.test(word)) {
-      set.add(word)
-      continue
-    }
-    if (word.length <= 2) set.add(word)
-    else for (let index = 0; index < word.length - 1; index += 1) set.add(word.slice(index, index + 2))
+const file = path.join(import.meta.dirname, '..', 'test', 'probe', 'questions.json')
+const suite = JSON.parse(readFileSync(file, 'utf8'))
+const threshold = Number(suite.threshold ?? 0.35)
+
+const questions = suite.questions.filter((item) =>
+  split === 'tune' ? !item.holdout : split === 'verify' ? item.holdout : true,
+)
+if (!questions.length) {
+  console.error(`没有符合 --split=${split} 的题目`)
+  process.exit(1)
+}
+
+const personas = personaArg ? [personaArg] : ['slot-1', 'slot-2', 'slot-3', 'default'].filter((id) => listTopicsSync(id).length)
+const types = ['single-hop', 'multi-hop', 'temporal', 'negative']
+
+/** One question against one persona's library. */
+export function judge(question, topics) {
+  const startedAt = performance.now()
+  const ranked = rankTopics(question.q, topics, topN)
+  const picked = selectTopics(question.q, topics, { topN, budget })
+  const ms = performance.now() - startedAt
+  const top = ranked[0]
+  const topSlug = top?.topic?.slug ?? '(无)'
+  const expected = question.expect
+  const ok = expected === null || expected === undefined
+    ? !top || top.score < threshold
+    : Array.isArray(expected)
+      ? Boolean(top && expected.includes(topSlug))
+      : topSlug === expected
+  return {
+    ok,
+    ms,
+    chars: picked.block.length,
+    got: topSlug,
+    score: top?.score ?? 0,
+    expected,
+    reason: !ok && (expected === null || expected === undefined) ? '误召回' : '未命中',
   }
-  return set
 }
 
-function coverage(queryTokens, docTokens) {
-  if (!queryTokens.size || !docTokens.size) return 0
-  let shared = 0
-  for (const token of queryTokens) if (docTokens.has(token)) shared += 1
-  return (shared / queryTokens.size) * 0.75 + (shared / docTokens.size) * 0.25
-}
-
-export function score(query, topic) {
-  const q = tokens(query)
-  // The prompt only shows slug + summary, so that line is what decides whether
-  // the model ever opens the file; the body is a supporting signal, not the lead.
-  const head = coverage(q, tokens(`${topic.slug} ${topic.summary}`))
-  const body = coverage(q, tokens(topic.body))
-  return head * 0.7 + body * 0.3
-}
-
-export function rank(query, topics) {
-  return topics
-    .map((topic) => ({ slug: topic.slug, score: Number(score(query, topic).toFixed(3)) }))
-    .sort((left, right) => right.score - left.score)
-}
-
-const allQuestions = JSON.parse(readFileSync(path.join(import.meta.dirname, '..', 'test', 'probe', 'questions.json'), 'utf8')).questions
-// Held-out split: tune on even indexes, verify on odd ones. Otherwise the numbers
-// are just "we tuned on the test set and it passed".
-const half = process.argv.find((arg) => arg.startsWith('--half='))?.split('=')[1] ?? ''
-const questions =
-  half === 'tune' ? allQuestions.filter((_, index) => index % 2 === 0)
-  : half === 'verify' ? allQuestions.filter((_, index) => index % 2 === 1)
-  : allQuestions
-const personas = personaArg
-  ? [personaArg]
-  : ['slot-1', 'slot-2', 'default'].filter((id) => listTopicsSync(id).length)
-
-let asked = 0
-let hit = 0
-const misses = []
-
+const rows = []
 for (const persona of personas) {
   const topics = listTopicsSync(persona)
   if (!topics.length) continue
   console.log(`\n== ${persona}（${topics.length} 个主题）==`)
-  for (const item of questions) {
-    const ranked = rank(item.q, topics)
-    const top = ranked[0]
-    const ok = item.expect === null ? !top || top.score < 0.35 : top?.slug === item.expect
-    asked += 1
-    if (ok) hit += 1
-    else misses.push({ persona, q: item.q, expect: item.expect, got: top?.slug ?? '(无)', score: top?.score ?? 0 })
-    const mark = ok ? '✓' : '✗'
-    console.log(`  ${mark} ${item.q}  →  ${top?.slug ?? '(无)'} ${top?.score ?? 0}${item.expect ? `（期望 ${item.expect}）` : '（负例）'}`)
+  for (const question of questions) {
+    const result = judge(question, topics)
+    rows.push({ persona, ...question, ...result })
+    const mark = result.ok ? '✓' : '✗'
+    const expectText = Array.isArray(result.expected) ? result.expected.join('|') : (result.expected ?? '(负例)')
+    console.log(
+      `  ${mark} [${question.type}] ${question.q}\n      → ${result.got} ${result.score}（期望 ${expectText}，注入 ${result.chars} 字符）`,
+    )
   }
 }
 
-console.log(`\n命中 ${hit}/${asked}（${asked ? Math.round((hit / asked) * 100) : 0}%）`)
-if (misses.length) {
-  console.log('未命中清单：')
-  for (const miss of misses) console.log(`  - [${miss.persona}] ${miss.q}：期望 ${miss.expect ?? '(空)'}，实际 ${miss.got}（${miss.score}）`)
+const width = 12
+const pad = (text, size = width) => String(text).padEnd(size)
+const padStart = (text, size = width) => String(text).padStart(size)
+
+console.log(`\n== 汇总（split=${split}，threshold=${threshold}）==`)
+console.log(`  ${pad('题型')}${padStart('题数', 6)}${padStart('命中', 6)}${padStart('命中率', 8)}${padStart('注入字符', 10)}${padStart('耗时', 9)}`)
+let total = 0
+let hits = 0
+let chars = 0
+let ms = 0
+for (const type of types) {
+  const bucket = rows.filter((row) => row.type === type)
+  if (!bucket.length) continue
+  const hit = bucket.filter((row) => row.ok).length
+  const charsAvg = Math.round(bucket.reduce((sum, row) => sum + row.chars, 0) / bucket.length)
+  const msAvg = bucket.reduce((sum, row) => sum + row.ms, 0) / bucket.length
+  total += bucket.length
+  hits += hit
+  chars += bucket.reduce((sum, row) => sum + row.chars, 0)
+  ms += bucket.reduce((sum, row) => sum + row.ms, 0)
+  console.log(
+    `  ${pad(type)}${padStart(bucket.length, 6)}${padStart(hit, 6)}${padStart(`${Math.round((hit / bucket.length) * 100)}%`, 8)}${padStart(charsAvg, 10)}${padStart(`${msAvg.toFixed(2)}ms`, 9)}`,
+  )
 }
-console.log('\n注意：这里只测「关键词打分能否定位到主题文件」，不代替真实会话里模型是否去读。')
-process.exit(hit === asked ? 0 : 1)
+const rate = total ? Math.round((hits / total) * 100) : 0
+console.log(
+  `  ${pad('合计')}${padStart(total, 6)}${padStart(hits, 6)}${padStart(`${rate}%`, 8)}${padStart(Math.round(chars / total), 10)}${padStart(`${(ms / total).toFixed(2)}ms`, 9)}`,
+)
+console.log(`\n三数同报：命中率 ${rate}%（${hits}/${total}）｜平均注入 ${Math.round(chars / total)} 字符｜平均耗时 ${(ms / total).toFixed(2)}ms`)
+
+const misses = rows.filter((row) => !row.ok)
+if (misses.length) {
+  console.log('\n未通过清单：')
+  for (const miss of misses) {
+    const expected = Array.isArray(miss.expected) ? miss.expected.join('|') : (miss.expected ?? '(负例)')
+    console.log(`  - [${miss.persona}/${miss.type}] ${miss.q}：期望 ${expected}，实际 ${miss.got}（${miss.score}）${miss.reason === '误召回' ? '← 负例被误召回' : ''}`)
+  }
+}
+
+const negativeLeak = rows.some((row) => row.type === 'negative' && !row.ok)
+const verifyGate = split === 'verify' ? rate >= 70 : true
+if (negativeLeak) console.log('\n失败：负例题被误召回，说明阈值/打分把无关问题也召回了。')
+if (split === 'verify' && !verifyGate) console.log(`\n失败：留出集命中率 ${rate}% 低于 70%，不能作为验收通过。`)
+console.log('\n注意：这里只测「打分能否把对的主题排到第一」，不代替真实会话里模型是否去读文件；注入字符即该块的提示词成本。')
+process.exit(negativeLeak || !verifyGate ? 1 : 0)

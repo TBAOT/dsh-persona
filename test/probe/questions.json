@@ -1,18 +1,105 @@
 {
-  "version": 1,
-  "note": "5 条由用户手写（source=user，待补），5 条取自历史会话的真实提问（source=history），2 条负例（expect=null，记忆里本来没有）。",
+  "version": 2,
+  "note": "题目全部取自旧会话 session-1acbf5de（168 轮、325 条真实用户消息）的原话，语料出处见 topics/legacy-session-corpus.md。expect 是期望命中的主题 slug；数组表示任一命中即可；null 表示库里本来没有，正确行为是不召回。holdout=true 的题只用于验收，不参与调参。",
+  "threshold": 0.35,
   "questions": [
-    { "q": "上次那个权限备份的文件夹现在能删吗", "expect": "权限修复", "source": "user" },
-    { "q": "清理脚本都清哪些目录，多久跑一次", "expect": "磁盘与清理", "source": "user-pending" },
-    { "q": "记忆方案的技术文档放在哪个目录", "expect": "记忆方案文档", "source": "user-pending" },
-    { "q": "丢文件了怎么从会话日志里恢复", "expect": "记忆方案文档", "source": "user-pending" },
-    { "q": "soul-md 的人设卡当时是怎么迁进来的", "expect": "迁移脚本", "source": "user-pending" },
-    { "q": "GitHub token 存在哪里，代理不通怎么办", "expect": "github-token", "source": "history" },
-    { "q": "dsh-runtimes 能不能删", "expect": "磁盘与清理", "source": "history" },
-    { "q": "归档的会话还能搬回来吗", "expect": "磁盘与清理", "source": "history" },
-    { "q": "那份记忆系统技术方案一共几篇", "expect": "记忆方案文档", "source": "history" },
-    { "q": "migrate-soul-md 脚本会把卡片放哪", "expect": "迁移脚本", "source": "history" },
-    { "q": "Kubernetes 的 sidecar 注入怎么写", "expect": null, "source": "negative" },
-    { "q": "用 Rust 编译 WASM 的步骤", "expect": null, "source": "negative" }
+    {
+      "q": "上次那个权限备份的文件夹现在能删吗",
+      "expect": "权限修复",
+      "type": "single-hop",
+      "source": "旧会话真实提问",
+      "holdout": false
+    },
+    {
+      "q": "C:\\Users\\34544\\.dsh 为什么现在这么乱？记忆怎么这么多文件？",
+      "expect": "磁盘与清理",
+      "type": "single-hop",
+      "source": "旧会话真实提问",
+      "holdout": false
+    },
+    {
+      "q": "那么现在什么情况才会拒绝写入？",
+      "expect": "memory-write-reject-policy",
+      "type": "single-hop",
+      "source": "旧会话真实提问",
+      "holdout": false
+    },
+    {
+      "q": "但是 Hermes 就不会拒绝写入呀，为什么？",
+      "expect": "hermes-memory-arch",
+      "type": "single-hop",
+      "source": "旧会话真实提问",
+      "holdout": true
+    },
+    {
+      "q": "现在的计划文档都在哪个文件夹内？",
+      "expect": "记忆方案文档",
+      "type": "single-hop",
+      "source": "旧会话真实提问",
+      "holdout": false
+    },
+    {
+      "q": "那我们现在的记忆系统用的什么原理",
+      "expect": "记忆系统细节",
+      "type": "single-hop",
+      "source": "旧会话真实提问",
+      "holdout": false
+    },
+    {
+      "q": "下一项按计划是遗忘，TTL 和失效链，高星项目是怎么订的？",
+      "expect": "forgetting-ttl-research",
+      "type": "single-hop",
+      "source": "旧会话真实提问",
+      "holdout": false
+    },
+    {
+      "q": "slot-1 不应该是验证角色吗？为什么里面还有码趣童年？",
+      "expect": "记忆系统细节",
+      "type": "single-hop",
+      "source": "旧会话真实提问",
+      "holdout": false
+    },
+    {
+      "q": "记忆写满以后会丢东西吗，还是直接拒绝",
+      "expect": ["memory-write-reject-policy", "记忆系统细节"],
+      "type": "multi-hop",
+      "source": "旧会话真实提问（合并两处关切）",
+      "holdout": false
+    },
+    {
+      "q": "DSH 更新后我的插件就会失效，是权限问题还是版本问题？",
+      "expect": ["记忆系统细节", "权限修复"],
+      "type": "multi-hop",
+      "source": "旧会话真实提问（合并两处关切）",
+      "holdout": true
+    },
+    {
+      "q": "一条记忆多久算过期，过期了会被删掉吗",
+      "expect": ["记忆系统细节", "forgetting-ttl-research"],
+      "type": "temporal",
+      "source": "旧会话真实提问（TTL 讨论）",
+      "holdout": false
+    },
+    {
+      "q": "被新事实推翻的旧条目去哪了",
+      "expect": ["forgetting-ttl-research", "记忆系统细节"],
+      "type": "temporal",
+      "source": "旧会话真实提问（失效链讨论）",
+      "holdout": true
+    },
+    {
+      "q": "Kubernetes 的 sidecar 注入怎么写",
+      "expect": null,
+      "type": "negative",
+      "source": "负例：记忆库里没有",
+      "holdout": true
+    },
+    {
+      "q": "怎么给 Obsidian 装双链插件",
+      "expect": null,
+      "type": "negative",
+      "source": "负例：记忆库里没有",
+      "holdout": true
+    }
   ]
 }
