@@ -115,6 +115,12 @@ Verdicts: `ok` / `broken` (shape or error failure) / `silent` (should have injec
 never did) / `unverified` (every row says `unknown`, so it cannot be attributed to a
 turn) / `stale` (no recent activity). Only `broken` and `silent` exit non-zero.
 
+`pnpm audit` looks at the memory itself: an empty topic summary, a topic over its cap,
+near-duplicate topics, duplicate facts inside a tier or across user/memory, and meta
+that no longer matches the files are errors; missing retrieval aliases, very long
+entries and a nearly full tier are advisories, because judging what a fact is worth
+is a human job.
+
 ## Confirming an upgrade took effect
 
 Plugin code only enters memory after a reload or restart (especially when installed
