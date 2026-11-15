@@ -20,6 +20,12 @@
 
 ## 0. 调研结论（三个待拍板问题已按 GitHub 实据改判）
 
+> **2026-11-15 更正**：本节最初引用的 Letta 代码来自 `archive` 分支（V1，已退役）；当前实现已迁到 [`letta-ai/letta-code`](https://github.com/letta-ai/letta-code)（3.8k star，每日在推）。现在的 Letta 不再有 `memory_rethink`/sleep-time 工具集，而是 **MemFS**：git 版本化的 Markdown 记忆 + `MEMORY.md` 逐级索引 + `.memfs.config.json` 限额 + 提交前校验。`memory_rethink` 那套说法只能当历史看。
+>
+> 当前 Letta 的默认限额（[memory-constraints.ts](https://github.com/letta-ai/letta-code/blob/main/src/memory-constraints.ts)）：`maxFileCharacters: 20000`、`maxCoreMemoryCharacters: 65536`（根目录所有 Markdown 的合计，即"进系统提示的部分"）、`maxDepth: 2`；另有 `fileCharacterLimits`（按 glob 覆盖）、`readOnlyFiles`（受保护文件不可改）、以及"改限额需人工批准"（`LETTA_MEMORY_CONSTRAINTS_UPDATE` 环境变量才允许改配置）。
+>
+> 对我们的意义：**「根目录放索引、正文放子目录」正是 Letta v2 的 root-marker 布局**，方案 A 的方向被验证；值得补借的是 `readOnlyFiles`（把核心文件对 agent 设只读）与"提高上限需人工批准"这条纪律，而不是 rethink 工具。
+
 | 问题 | 实据 | 改判 |
 |---|---|---|
 | 条目该多长 | 没有项目按"每条 60–80 字"限制：Letta 的块上限是 `CORE_MEMORY_PERSONA_CHAR_LIMIT = 20000`、`CORE_MEMORY_HUMAN_CHAR_LIMIT = 20000`、`CORE_MEMORY_BLOCK_CHAR_LIMIT = 100000` 字符（[constants.py](https://github.com/letta-ai/letta/blob/archive/letta/constants.py)）；mem0 的提取提示要求每条是 **15–80 词的自包含陈述**（[prompts.py](https://github.com/mem0ai/mem0/blob/main/mem0/configs/prompts.py)）；generative agents 每个记忆节点是**一句话**的 observation/thought，另带 poignancy/keywords/embedding（[associative_memory.py](https://github.com/joonspk-research/generative-agents/blob/main/reverie/backend_server/persona/memory_structures/associative_memory.py)） | **不用 60 字**。取「一条一个事实、≤120 字、一句话」：3000 ÷ 120 ≈ 25 条，条件分支写得下 |
