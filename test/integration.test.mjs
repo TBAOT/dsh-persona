@@ -107,7 +107,9 @@ test('a turn injects recall and the review records it as injected', async () => 
     // step 1's record, turning a healthy turn into `skipped` (seen live after 0.10.4).
     const later = { kind: 'enter', messages: out[0].messages }
     const second = await emit(host.listeners, 'agent/pre-step', { agent, turn, step: 2 }, async () => later)
-    assert.equal(second[0], later, '第二步不该再注入，也不该改写消息')
+    // Step 2 must not inject a second block. It may return a new object (stale blocks
+    // are stripped), so compare the content, not the reference.
+    assert.equal(second[0].messages[0].content.match(/可能相关的主题/g)?.length ?? 0, 1)
 
     await emit(host.listeners, 'session/event', { id: 'session-e2e' }, {
       type: 'user/message',

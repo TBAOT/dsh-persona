@@ -154,6 +154,29 @@ test('over-limit write is refused and reports the current entries', async () => 
   })
 })
 
+test('last turn’s block is stripped so it neither piles up nor shows twice', async () => {
+  await withTempHome(async () => {
+    const host = fakeHost()
+    resetRecall()
+    apply(host.ctx, { personaId: 'tester' })
+    await writeTopic('tester', { slug: '磁盘与清理', summary: '清理脚本与会话归档判据', content: 'clean-dsh.ps1 清 %TEMP%。' })
+    const handler = (host.listeners.get('agent/pre-step') ?? [])[0]
+    const agent = { id: 'session-strip' }
+
+    const first = { kind: 'enter', messages: [{ role: 'user', content: '清理脚本都清哪些目录' }] }
+    const once = await handler({ agent, turn: 1, step: 1 }, async () => first)
+    const withBlock = once.messages[0].content
+    assert.match(withBlock, /可能相关的主题/)
+
+    // The Host persists that message; next turn the same text comes back as history.
+    const second = { kind: 'enter', messages: [{ role: 'user', content: withBlock }, { role: 'user', content: '清理脚本都清哪些目录' }] }
+    const twice = await handler({ agent, turn: 2, step: 1 }, async () => second)
+    const texts = twice.messages.map((message) => message.content)
+    assert.equal(texts[0].includes('可能相关的主题'), false, '旧块必须被剥掉')
+    assert.equal(texts[1].match(/可能相关的主题/g).length, 1, '只保留本轮的块')
+  })
+})
+
 test('unknown target is rejected', async () => {
   await withTempHome(async () => {
     const host = fakeHost()
@@ -223,7 +246,7 @@ test('recall injects once per turn and never into a rejected step', async () => 
     // and re-injecting would double its cost for no gain.
     const second = { kind: 'enter', messages: [{ role: 'user', content: '清理脚本都清哪些目录' }] }
     const twice = await handler({ agent, turn: 5, step: 2 }, async () => second)
-    assert.equal(twice, second)
+    assert.equal(twice.messages[0].content, '清理脚本都清哪些目录', '第二步不再追加块')
     assert.equal(recallSummary().outcome, 'skipped')
 
     const rejected = { kind: 'reject' }
