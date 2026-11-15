@@ -98,6 +98,27 @@ test('a topic written without a summary derives one from its first sentence', as
   })
 })
 
+test('retrieval aliases survive a rewrite and stay out of the index line', async () => {
+  await withTempHome(async () => {
+    await writeTopic('slot-1', {
+      slug: 'permission',
+      summary: 'ACL 备份与回滚',
+      keywords: '权限备份，文件夹，能不能删',
+      content: '第一段。',
+    })
+    const first = listTopicsSync('slot-1').find((topic) => topic.slug === 'permission')
+    assert.deepEqual(first.keywords, ['权限备份', '文件夹', '能不能删'])
+
+    // Appending more detail must not drop the aliases set earlier.
+    await writeTopic('slot-1', { slug: 'permission', content: '第二段。' })
+    assert.deepEqual(listTopicsSync('slot-1').find((topic) => topic.slug === 'permission').keywords, ['权限备份', '文件夹', '能不能删'])
+
+    const index = renderTopicIndex(listTopicsSync('slot-1'), 500)
+    assert.match(index, /permission｜ACL/)
+    assert.ok(!index.includes('能不能删'), '别名只参与打分，不占索引字符')
+  })
+})
+
 test('overlap spots near-duplicate subjects', () => {
   assert.ok(overlap('打印机队列为空，需要重建', '打印机队列是空的，需要重建队列') > 0.5)
   assert.ok(overlap('打印机', '数据库迁移') < 0.3)

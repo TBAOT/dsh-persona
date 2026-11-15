@@ -160,11 +160,34 @@ node scripts/migrate-soul-md.mjs --persona slot-1 \
 一个角色 = 一个 `personaId` = 一份记忆。想让多个角色各自独立，为每个角色挂一行
 `dsh-persona`，给不同的 `personaId`。构建者也可以把它挂进各自角色的预设里。
 
+其余可调项（都在同一行 config 下）：`topics` 关掉主题库、`topicsIndexLimit` 索引字符上限（默认 600）、
+`topicTtlDays` 主题多久不更新就不再注入（默认 90，0 关闭）、`recallTopN` 每轮召回几篇摘要（默认 3，0 关闭）、
+`recallBudget` 召回块字符预算（默认 400）、`routeThreshold` 常驻到这个比例就把 add 转存主题（默认 0.9）、
+`addOverflow: reject` 改回硬拒绝。
+
+## 检索与评测
+
+- 打分：主题的 `slug + summary + keywords` 组成 head（占 0.7），正文占 0.3；CJK 按 2-gram，拉丁按词；
+  再乘上按主题库统计的 IDF 权重，压掉「记忆」「dsh」这类到处都有的词。
+- 主题 front matter 支持一行别名：`keywords: 权限备份,能不能删`。别名只参与打分，不占提示词里的索引字符，
+  用来接住「换个词问同一件事」的召回。
+- 评测：`pnpm probe --persona=slot-1 --split=tune|verify`，报三个数——命中率、平均注入字符、平均耗时，
+  并按 single-hop / multi-hop / temporal / negative 分类。题目在 `test/probe/questions.json`，
+  全部取自真实会话里的用户原话，`holdout` 与调参集分开跑，负例被误召回时退出码非零。
+- 2026-11-15 基线（slot-1，14 题）：tune 89%（8/9）、verify 100%（5/5）、平均注入 177 字符。
+- 已知局限：很长很口语的问题会把分数稀释（覆盖率按查询长度归一），这类查询仍可能漏。
+
 ## 隐私
 
 - 记忆是本地明文文件，不会上传到任何地方。
 - 只有模型调用时，注入的那部分文本会随提示词发给**你自己配置的模型供应商**。
 - 插件本身不联网。
+
+## 接口的安全边界
+
+面板接口只服务本机：要求固定请求头 `x-dsh-persona: 1`，并拒绝非 loopback 的 `Host`、跨站 `Origin`
+和预检请求（`OPTIONS`）。**这不是身份认证**——本机任意进程仍能带头发请求，所以不要把这台机器的
+DSH Web 端口暴露到不受信网络。
 
 ## 卸载
 

@@ -32,6 +32,24 @@ test('the recall block respects its budget and keeps the header', () => {
   assert.equal(buildRecallBlock('清理脚本都清哪些目录', topics, { topN: 0 }), '')
 })
 
+test('aliases let a paraphrase reach the topic its summary would miss', () => {
+  const library = [
+    {
+      slug: '权限修复',
+      summary: 'ACL 备份与回滚：三份留档',
+      keywords: ['那个权限备份的文件夹', '能不能删'],
+      body: 'acl-recovery 目录里有 backup 与报告。',
+    },
+    { slug: 'plan-062-to-080', summary: '止血与召回方案', keywords: [], body: '阶段一压缩常驻。' },
+  ]
+  const query = '上次那个权限备份的文件夹现在能删吗'
+  assert.equal(rankTopics(query, library)[0].topic.slug, '权限修复')
+  // Without aliases the same query has to survive on the summary alone.
+  const withoutAliases = library.map((topic) => ({ ...topic, keywords: [] }))
+  const bare = rankTopics(query, withoutAliases)[0]
+  assert.ok(bare.score <= rankTopics(query, library)[0].score)
+})
+
 test('selectTopics says why it produced nothing', () => {
   assert.equal(selectTopics('嗯', topics).reason, 'trivial')
   assert.equal(selectTopics('Kubernetes sidecar 怎么写', topics).reason, 'no-match')

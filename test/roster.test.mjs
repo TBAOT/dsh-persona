@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import {
+  allowRequest,
   apply,
   bindWorkspace,
   createPersona,
@@ -173,6 +174,20 @@ test('api rejects requests without the gate header', async () => {
     const result = await callApi(call, { url: '/dsh-persona/api/list' })
     assert.equal(result.status, 403)
   })
+})
+
+test('the gate refuses non-loopback hosts and cross-site origins', () => {
+  const ok = { host: '127.0.0.1:52233', 'x-dsh-persona': '1' }
+  assert.equal(allowRequest(ok).ok, true)
+  assert.equal(allowRequest({ ...ok, host: 'localhost:52233' }).ok, true)
+  assert.equal(allowRequest({ ...ok, host: '[::1]:52233' }).ok, true)
+
+  assert.equal(allowRequest({ ...ok, host: 'evil.example:80' }).ok, false)
+  assert.equal(allowRequest({ ...ok, origin: 'https://evil.example' }).ok, false)
+  assert.equal(allowRequest({ ...ok, origin: 'not a url' }).ok, false)
+  assert.equal(allowRequest({ ...ok, origin: 'http://127.0.0.1:52233' }).ok, true)
+  assert.equal(allowRequest({ ...ok, 'sec-fetch-site': 'cross-site' }).ok, false)
+  assert.equal(allowRequest({ host: '127.0.0.1:52233' }).ok, false, '缺门禁头也要拒')
 })
 
 test('api creates, lists and resolves personas', async () => {
