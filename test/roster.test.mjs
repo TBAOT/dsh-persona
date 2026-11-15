@@ -190,6 +190,33 @@ test('the gate refuses non-loopback hosts and cross-site origins', () => {
   assert.equal(allowRequest({ host: '127.0.0.1:52233' }).ok, false, '缺门禁头也要拒')
 })
 
+test('health reports the last recall record for one persona', async () => {
+  await withTempHome(async (home) => {
+    const { ctx, call } = fakeHost()
+    apply(ctx, {})
+    const dir = path.join(home, 'personas', 'slot-1', 'review')
+    await mkdir(dir, { recursive: true })
+    await writeFile(
+      path.join(dir, 'metrics.jsonl'),
+      `${JSON.stringify({
+        at: new Date().toISOString(),
+        turn: 3,
+        status: 'written',
+        recall: { outcome: 'injected', chars: 171, topics: ['磁盘与清理'], ms: 4, turn: 3 },
+        tokens: { in: 100, out: 5, cacheRead: 0 },
+        usageMissing: false,
+      })}\n`,
+      'utf8',
+    )
+    const result = await callApi(call, { url: '/dsh-persona/api/health?id=slot-1', headers: { 'x-dsh-persona': '1' } })
+    assert.equal(result.status, 200)
+    assert.equal(result.body.verdict, 'ok')
+    assert.equal(result.body.injected, 1)
+    assert.equal(result.body.last.recall.outcome, 'injected')
+    assert.equal(result.body.last.recall.chars, 171)
+  })
+})
+
 test('api creates, lists and resolves personas', async () => {
   await withTempHome(async (home) => {
     const workspace = path.join(home, 'proj')
