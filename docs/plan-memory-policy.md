@@ -2,15 +2,22 @@
 
 状态：**待批准**。日期 2026-11-15，基线 0.11.0-4。
 
-## 0. 为什么做这个
+## 0. 先查别人怎么实现（这次不自己拍）
 
-前一轮查证（[letta-code 的 MemFS](https://github.com/letta-ai/letta-code/blob/main/src/memory-constraints.ts)）暴露了我们缺的不是"更聪明的检索"，而是**护栏**：
+| 项目 | 有没有"只读 / 限额审批" | 具体做法（源码为据） |
+|---|---|---|
+| [`letta-ai/letta-code`](https://github.com/letta-ai/letta-code)（3.8k★，活跃） | **两个都有** | ① 只读靠**受保护的路径 glob**：`.memfs.config.json` 里的 `readOnlyFiles`，"matching paths cannot be created, changed or removed"，由 git **pre-commit 校验器**在提交时拦截；② 限额也在这个文件里（`maxFileCharacters` / `fileCharacterLimits` / `maxCoreMemoryCharacters` / `maxDepth`），而**改这个文件本身要人工批准**——校验器里写死 `if (configChanged && env[LETTA_MEMORY_CONSTRAINTS_UPDATE] !== '1') error("requires human approval to change")`；提示语还写着 *"Do not raise or disable these limits unless the user explicitly approves it."* |
+| Letta V1（archive） | 有 | 每个 block 有 `read_only: bool` 字段；编辑只读块的错误文案是 `READ_ONLY_BLOCK_EDIT_ERROR = "Error This block is read-only and cannot be edited."` |
+| `mem0ai/mem0`（69k★） | 没有 | 只有作用域隔离（`user_id` / `agent_id` / `run_id`）与归属标记（`attributed_to`）；没有"某些记忆不可被 agent 改"的概念 |
+| `getzep/graphiti`（33k★） | 没有 | 只有时间失效；不区分"人写"与"agent 写" |
+| `run-llama/llama_index`（53k★） | 没有 | 记忆是应用侧对象，agent 不直接写 |
 
-- Letta 的 `readOnlyFiles` 可以让某些记忆对 agent 只读，只有人能改；
-- Letta 改限额要 `LETTA_MEMORY_CONSTRAINTS_UPDATE`，**不能由 agent 或随手改配置提高**；
-- Letta 的限额是分层的：`maxFileCharacters`（单文件）+ `fileCharacterLimits`（按 glob 覆盖）+ `maxCoreMemoryCharacters`（进提示词的总量）+ `maxDepth`。
+**结论**：只读 + 限额审批**不是行业标配，只有 Letta 做了**；而它做的两件事特别值得抄：
 
-我们现在只有一个全局常量组合：`ENTRY_MAX_CHARS=120`、`TOPIC_MAX_CHARS=4000`、每个角色的 `{user, memory}` 两档上限。缺"谁可以改哪些文件"这一层。
+1. **策略文件本身是"人工所有"的**：agent 能写记忆内容，但改不了规则文件；改规则需要一个只有人能设的开关（env var）。
+2. **拦截点放在"提交"这一层**：不是在每个写入口散落判断，而是在唯一的落盘闸门统一校验，并且"只拦本次改动引入的问题，历史问题打 warning"。
+
+我们照此翻译成没有 git 的版本：`policy.json` = 那个人工所有的规则文件；插件**永不写它**；面板是唯一写入方；所有写入口在落盘前查它；提高上限 = 面板里一次显式确认 + 审计行。
 
 ## 1. 目标与非目标
 
@@ -58,7 +65,9 @@
 
 字数上限的生效点：`store.applyOperation`（条目）、`topics.writeTopic`（主题）、`applyRethink`（整层）。取值顺序：policy → 常量默认。
 
-## 4. 限额审批
+**为什么集中在一个闸门**（照 Letta 把校验放在 pre-commit）：写入口会越加越多（工具、复盘、整理轮、脚本、面板），每个入口各写一遍"是否只读"迟早漏一处。所以新增一个 `assertWritable(persona, target)`，所有落盘前的路径都必须先过它；绕过它的写法在 review 里会被当成 bug。
+
+## 4. 限额审批（照 Letta 的"规则文件归人"）
 
 - **谁能改**：只有面板（人）或手改 `policy.json`；
 - **改的时候留痕**：面板保存后追加一条 `review/log.jsonl`，`{actor: 'human', action: 'limits', from, to}`；
