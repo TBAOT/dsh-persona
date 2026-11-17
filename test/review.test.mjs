@@ -392,6 +392,27 @@ test('a tight tier is rewritten by the background pass, not by the chat turn', a
   })
 })
 
+test('a read-only tier is skipped by the reviewer, and says so in the log', async () => {
+  await withTempHome(async (home) => {
+    const reply = JSON.stringify({ ops: [{ target: 'memory', action: 'add', content: '这条不该被写进去' }] })
+    const host = fakeHost(reply)
+    apply(host.ctx, { personaId: 'tester' })
+    const dir = path.join(home, 'personas', 'tester', 'memory')
+    await mkdir(dir, { recursive: true })
+    await writeFile(path.join(dir, 'policy.json'), JSON.stringify({ version: 1, readOnly: ['memory'] }), 'utf8')
+    await writeFile(path.join(dir, 'memory.md'), '<!-- dsh-persona v1 target=memory -->\n原有条目\n', 'utf8')
+
+    await feedTurn(host)
+    await emit(host.listeners, 'agent/turn-stopping', { agent: { id: 'session-1' }, turn: 6 })
+    await tick()
+
+    const text = await readFile(path.join(dir, 'memory.md'), 'utf8')
+    assert.equal(text.includes('这条不该被写进去'), false, '只读档不能被复盘写入')
+    const log = await waitForFile(path.join(home, 'personas', 'tester', 'review', 'log.jsonl'))
+    assert.match(log, /read-only/)
+  })
+})
+
 test('token usage reported by the stream lands in the metrics', async () => {
   await withTempHome(async (home) => {
     const host = fakeHost([{
