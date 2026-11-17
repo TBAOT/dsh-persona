@@ -219,6 +219,36 @@ test('health reports the last recall record for one persona', async () => {
   })
 })
 
+test('policy is readable and writable through the panel api, with an audit line', async () => {
+  await withTempHome(async (home) => {
+    const { ctx, call } = fakeHost()
+    apply(ctx, {})
+    const headers = { 'x-dsh-persona': '1' }
+
+    const before = await callApi(call, { url: '/dsh-persona/api/policy?id=default', headers })
+    assert.equal(before.status, 200)
+    assert.deepEqual(before.body.policy.readOnly, [])
+    assert.equal(before.body.present, false)
+
+    const saved = await callApi(call, {
+      url: '/dsh-persona/api/policy?id=default',
+      method: 'POST',
+      headers,
+      body: { id: 'default', readOnly: ['user'] },
+    })
+    assert.equal(saved.status, 200)
+    assert.deepEqual(saved.body.policy.readOnly, ['user'])
+
+    const after = await callApi(call, { url: '/dsh-persona/api/policy?id=default', headers })
+    assert.deepEqual(after.body.policy.readOnly, ['user'])
+    assert.equal(after.body.present, true)
+
+    const log = await readFile(path.join(home, 'personas', 'default', 'review', 'log.jsonl'), 'utf8')
+    assert.match(log, /"actor":"human"/)
+    assert.match(log, /"action":"policy"/)
+  })
+})
+
 test('api creates, lists and resolves personas', async () => {
   await withTempHome(async (home) => {
     const workspace = path.join(home, 'proj')
