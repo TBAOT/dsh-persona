@@ -20,6 +20,7 @@ import { writeTopic } from '../lib/topics.js'
 function fakeHost(reply) {
   const listeners = new Map()
   const calls = []
+  const contexts = new Map()
   const ctx = {
     logger: { warn() {}, info() {} },
     on(event, handler) {
@@ -32,7 +33,13 @@ function fakeHost(reply) {
       return () => (typeof dispose === 'function' ? dispose() : undefined)
     },
     tools: { register: () => () => {} },
-    systemPrompt: { section: () => () => {} },
+    systemPrompt: {
+      section: () => () => {},
+      context: (entry) => {
+        contexts.set(entry.name, entry)
+        return () => {}
+      },
+    },
     get(name) {
       if (name === 'agentDefaultModel') return { currentSelection: () => ({ provider: 'fake', model: 'fake-model' }) }
       return undefined
@@ -48,7 +55,7 @@ function fakeHost(reply) {
       },
     },
   }
-  return { ctx, listeners, calls }
+  return { ctx, listeners, calls, contexts }
 }
 
 async function withTempHome(fn) {
@@ -101,15 +108,16 @@ test('a turn injects recall and the review records it as injected', async () => 
     const turn = 7
     const decision = { kind: 'enter', messages: [{ role: 'user', content: '清理脚本都清哪些目录' }] }
     const out = await emit(host.listeners, 'agent/pre-step', { agent, turn, step: 1 }, async () => decision)
-    assert.equal(out[0].messages[0].content.includes('可能相关的主题'), true, '召回块必须进到这一轮的消息里')
+    // The block lives in runtime context now, never in the user's message.
+    assert.equal(out[0].messages[0].content, '清理脚本都清哪些目录')
+    assert.match(host.contexts.get('persona:recall').text({ agent }), /可能相关的主题/)
 
     // A real turn runs several steps. Step 2 correctly skips — and used to overwrite
     // step 1's record, turning a healthy turn into `skipped` (seen live after 0.10.4).
     const later = { kind: 'enter', messages: out[0].messages }
     const second = await emit(host.listeners, 'agent/pre-step', { agent, turn, step: 2 }, async () => later)
-    // Step 2 must not inject a second block. It may return a new object (stale blocks
-    // are stripped), so compare the content, not the reference.
-    assert.equal(second[0].messages[0].content.match(/可能相关的主题/g)?.length ?? 0, 1)
+    assert.equal(second[0].messages[0].content, '清理脚本都清哪些目录', '第二步不再改写消息')
+    assert.equal(host.contexts.get('persona:recall').text({ agent }).match(/可能相关的主题/g).length, 1)
 
     await emit(host.listeners, 'session/event', { id: 'session-e2e' }, {
       type: 'user/message',

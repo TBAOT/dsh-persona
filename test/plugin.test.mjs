@@ -12,6 +12,7 @@ import { writeTopic } from '../lib/topics.js'
 function fakeHost() {
   const tools = new Map()
   const sections = new Map()
+  const contexts = new Map()
   const listeners = new Map()
   const ctx = {
     logger: { warn() {}, info() {} },
@@ -35,9 +36,13 @@ function fakeHost() {
         sections.set(section.name, section)
         return () => {}
       },
+      context(entry) {
+        contexts.set(entry.name, entry)
+        return () => {}
+      },
     },
   }
-  return { ctx, tools, sections, listeners }
+  return { ctx, tools, sections, contexts, listeners }
 }
 
 async function withTempHome(fn) {
@@ -165,15 +170,15 @@ test('last turn’s block is stripped so it neither piles up nor shows twice', a
 
     const first = { kind: 'enter', messages: [{ role: 'user', content: '清理脚本都清哪些目录' }] }
     const once = await handler({ agent, turn: 1, step: 1 }, async () => first)
-    const withBlock = once.messages[0].content
-    assert.match(withBlock, /可能相关的主题/)
+    assert.equal(once.messages[0].content, '清理脚本都清哪些目录', '新版本不再把块写进消息')
+    assert.match(host.contexts.get('persona:recall').text({ agent }), /可能相关的主题/)
 
-    // The Host persists that message; next turn the same text comes back as history.
-    const second = { kind: 'enter', messages: [{ role: 'user', content: withBlock }, { role: 'user', content: '清理脚本都清哪些目录' }] }
+    // Older versions did append the block; those messages are still in history.
+    const legacy = '清理脚本都清哪些目录\n\n可能相关的主题（需要细节再按 slug 读 topics/<slug>.md）：\n- 旧主题｜旧的'
+    const second = { kind: 'enter', messages: [{ role: 'user', content: legacy }] }
     const twice = await handler({ agent, turn: 2, step: 1 }, async () => second)
-    const texts = twice.messages.map((message) => message.content)
-    assert.equal(texts[0].includes('可能相关的主题'), false, '旧块必须被剥掉')
-    assert.equal(texts[1].match(/可能相关的主题/g).length, 1, '只保留本轮的块')
+    assert.equal(twice.messages[0].content, '清理脚本都清哪些目录', '历史里的旧块必须被剥掉')
+    assert.equal(host.contexts.get('persona:recall').text({ agent }).match(/可能相关的主题/g).length, 1)
   })
 })
 
@@ -216,10 +221,14 @@ test('the pre-step hook injects a recall block into the step it is entering', as
     )
 
     assert.equal(out.kind, 'enter')
-    assert.notEqual(out, decision, '注入后返回的必须是新的 decision')
-    assert.match(out.messages[0].content, /可能相关的主题/)
-    assert.match(out.messages[0].content, /磁盘与清理/)
-    assert.equal(decision.messages[0].content, '清理脚本都清哪些目录', '不得改写传进来的消息')
+    // The block must NOT go into the messages any more: the Host persists those and the
+    // user would see the pointers inside their own bubble.
+    assert.equal(out.messages[0].content, '清理脚本都清哪些目录')
+    const recallContext = host.contexts.get('persona:recall')
+    assert.ok(recallContext, '召回必须注册成 runtime context')
+    const rendered = recallContext.text({ agent })
+    assert.match(rendered, /可能相关的主题/)
+    assert.match(rendered, /磁盘与清理/)
 
     const summary = recallSummary()
     assert.equal(summary.outcome, 'injected')
@@ -240,13 +249,16 @@ test('recall injects once per turn and never into a rejected step', async () => 
 
     const first = { kind: 'enter', messages: [{ role: 'user', content: '清理脚本都清哪些目录' }] }
     const once = await handler({ agent, turn: 5, step: 1 }, async () => first)
-    assert.equal(once.messages[0].content.match(/可能相关的主题/g).length, 1)
+    assert.equal(once.messages[0].content, '清理脚本都清哪些目录', '消息本身不被改写')
+    const ctxEntry = host.contexts.get('persona:recall')
+    assert.equal(ctxEntry.text({ agent }).match(/可能相关的主题/g).length, 1)
 
-    // Same turn, second step: the block from step 1 is already in the history,
-    // and re-injecting would double its cost for no gain.
+    // Same turn, second step: the block from step 1 is already in the context, and
+    // re-computing would only cost time.
     const second = { kind: 'enter', messages: [{ role: 'user', content: '清理脚本都清哪些目录' }] }
     const twice = await handler({ agent, turn: 5, step: 2 }, async () => second)
-    assert.equal(twice.messages[0].content, '清理脚本都清哪些目录', '第二步不再追加块')
+    assert.equal(twice.messages[0].content, '清理脚本都清哪些目录', '第二步不再算块')
+    assert.equal(ctxEntry.text({ agent }).match(/可能相关的主题/g).length, 1, '上下文里只有一份')
     assert.equal(recallSummary().outcome, 'skipped')
 
     const rejected = { kind: 'reject' }

@@ -48,7 +48,7 @@ const fakeHost = () => {
           return () => {}
         },
       },
-      systemPrompt: { section: () => () => {} },
+      systemPrompt: { section: () => () => {}, context: () => () => {} },
     },
     listeners,
   }
