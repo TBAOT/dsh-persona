@@ -61,6 +61,21 @@ test('an empty topic summary and near-duplicate topics are errors', async () => 
   })
 })
 
+test('a broken or contradictory policy is reported', async () => {
+  await withTempHome(async () => {
+    await writeEntries('pol', 'memory', ['项目用 pnpm'])
+    await refreshMeta('pol')
+    const dir = path.join(process.env.DSH_HOME, 'personas', 'pol', 'memory')
+    await writeFile(path.join(dir, 'policy.json'), '{ nope', 'utf8')
+    const broken = auditPersona('pol', { limits: { user: 1375, memory: 3000 } })
+    assert.ok(kinds(broken).includes('policy-unreadable'))
+
+    await writeFile(path.join(dir, 'policy.json'), JSON.stringify({ version: 1, limits: { memory: 1200 } }), 'utf8')
+    const differing = auditPersona('pol', { limits: { user: 1375, memory: 3000 } })
+    assert.ok(kinds(differing).includes('policy-limits-differ'))
+  })
+})
+
 test('meta that no longer matches the files is reported as drift', async () => {
   await withTempHome(async () => {
     await writeEntries('drift', 'memory', ['第一条'])

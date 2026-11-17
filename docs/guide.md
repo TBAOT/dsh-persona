@@ -85,6 +85,24 @@ operations: [{ action: add | patch | remove, content, old_text }]
 
 **为什么整理不给你在对话里调用**：照 Letta 的做法（`memory_rethink` 只给 sleep-time agent），对话轮只做精确编辑，整层重写放在后台——避免它在聊天中途大扫除。
 
+## 4.4 谁可以改哪些记忆（`memory/policy.json`）
+
+规则文件**归人所有**：插件永不写它，面板是唯一写入方（照 Letta 的 `.memfs.config.json` + "改它要人工批准"）。
+
+```json
+{ "version": 1, "readOnly": ["user"], "entryMaxChars": 120, "topicMaxChars": 4000,
+  "limits": { "user": 1375, "memory": 3000 } }
+```
+
+| 字段 | 作用 | 默认 |
+|---|---|---|
+| `readOnly` | agent 不可写的档：`user` / `memory` / `topic`（面板仍可写） | `[]`（全开） |
+| `entryMaxChars` | 单条常驻上限 | 120 |
+| `topicMaxChars` | 单篇主题上限 | 4000 |
+| `limits` | 覆盖 `index.json` 的容量；冲突时**以 policy 为准** | 无 |
+
+生效点：`memory` 工具、复盘、后台整理轮、`writeTopic` 全部先过 `assertWritable`；只读被拦时工具回执写明"只有人能在面板解锁"，复盘记 `rejected: read-only`。文件坏了不会阻断记忆——回落默认值并给一条警告。
+
 ## 5. 容量：撞上限会发生什么
 
 | 情形 | 行为 |
