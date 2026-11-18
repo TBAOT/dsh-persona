@@ -161,6 +161,28 @@ operations: [{ action: add | patch | remove, content, old_text }]
 | `ttlDays` | `{memory:180}` | 条目有效期（日期粒度，读侧过滤） |
 | `enabled` / `dryRun` / `everyTurns` / `maxTokens` / `provider` / `model` | 复盘相关 | 关闭复盘、只记不写、每几轮一次、输出预算、指定模型 |
 
+## 9.5 升级 DSH 之后怎么确认没坏
+
+插件声明了 `engines.dsh`（当前 `>=0.2.2-rc.1 <0.3.0`），安装/启用时加载器会按它拦版本；但**版本号拦不住"字段改名"**——我们踩过两次（`TokenUsage` 变 camelCase、`finish.reason` 变对象），都是版本号合法、行为静默失效。
+
+所以插件启动时会**探测宿主接缝**，结果写到 `~/.dsh/storages/persona-compat.json`，并出现在两处：
+
+```powershell
+pnpm health   # 末尾一行：宿主兼容：插件 0.11.11 · 必需接口齐全 · 召回走 runtime-context
+curl -H "x-dsh-persona: 1" "http://127.0.0.1:<port>/dsh-persona/api/health?id=slot-1"   # 字段 compat
+```
+
+| 探测项 | 必需 | 缺了会怎样 |
+|---|---|---|
+| `events`（`ctx.on`） | 是 | 插件无法工作，`health` 退出码 1 |
+| `tools`（`ctx.tools.register`） | 是 | 同上 |
+| `promptSections`（`ctx.systemPrompt.section`） | 是 | 同上 |
+| `runtimeContext`（`ctx.systemPrompt.context`） | 否 | **降级**：召回块回落到追加用户消息（会出现在你的消息里），并记 `degraded` |
+
+**降级不等于坏**：`health` 里看到 `降级 xxx` 说明那条路走了旧的兜底；看到 `缺必需接口` 才是真不兼容。
+
+**本机是 unmanaged 形态的插件**（不在 bundles 列表里），改完代码 `set_bundle` 只会回 `restart-required`，**必须重启 DSH** 才生效。
+
 ## 10. 已知限制（诚实版）
 
 1. **检索是关键词**：CJK 2-gram + 摘要/别名 + IDF。问句里若没有稀有词（"DSH 更新后插件失效"），可能被"沾边"的主题抢走——留出集当前 80%，不是 100%。
