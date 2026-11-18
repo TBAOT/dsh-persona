@@ -4,7 +4,7 @@
 
 **让 DeepSeek Harness 记住你，并且只记该记的。** 每个角色一份独立记忆：两档常驻（用户画像 + 角色笔记）+ 一个按需读取的主题库；每轮结束自动复盘，不用你说"记住这个"。
 
-![面板](docs/preview.svg)
+![面板](docs/preview.png)
 
 ```sh
 dsh plugin --profile <profile> add github:TBAOT/dsh-persona
@@ -16,6 +16,8 @@ dsh plugin --profile <profile> add github:TBAOT/dsh-persona
 - **记得住**：会话开始注入画像与笔记，写得进、查得到、能改能删，历史留档不硬删。
 - **不膨胀**：一条一个事实（≤120 字），写满自动转存主题；常驻 ≥90% 时在复盘后自动整理。
 - **看得见**：`pnpm health` 报告召回是否真的注入了、`pnpm audit` 查记忆结构、`pnpm probe` 用量化题集量检索质量。
+
+![用户画像](docs/preview-profile.png)
 
 > npm 上的 `dsh-persona` 是**别人占的名字**（`0.0.1`，描述写着 name reserved），本仓库没有发布到 npm，请从 git 安装。
 

@@ -7,7 +7,7 @@ memory per persona: two resident tiers (your profile + the persona's own notes) 
 topic library read on demand. A per-turn review writes it for you, so you never have to
 say "remember this".
 
-![panel](docs/preview.svg)
+![panel](docs/preview.png)
 
 ```sh
 dsh plugin --profile <profile> add github:TBAOT/dsh-persona
@@ -23,6 +23,8 @@ left sidebar.
   facts spill into topics, and a background pass rewrites the tier after the review.
 - **It is measurable**: `pnpm health` says whether recall actually injected, `pnpm audit`
   checks memory structure, `pnpm probe` scores retrieval against real questions.
+
+![profile](docs/preview-profile.png)
 
 > The name `dsh-persona` on npm belongs to someone else (a placeholder `0.0.1`).
 > This repository is not published to npm — install it from git.
