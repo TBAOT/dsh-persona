@@ -2,245 +2,117 @@
 
 [![verify](https://github.com/TBAOT/dsh-persona/actions/workflows/verify.yml/badge.svg)](https://github.com/TBAOT/dsh-persona/actions/workflows/verify.yml)
 
-**让 DeepSeek Harness 记住你，并且只记该记的。** 每个角色一份独立记忆：两档常驻（用户画像 + 角色笔记）+ 一个按需读取的主题库；每轮结束自动复盘，不用你说"记住这个"。
+给 DeepSeek Harness 的**角色记忆**：每个角色一份，自动写，不乱长，你随时看得见也改得动。
 
-![面板](docs/preview.png)
+![角色记忆](docs/preview.png)
 
-```sh
-dsh plugin --profile <profile> add github:TBAOT/dsh-persona
-# 把 dsh-persona 加进 profile 的 dsh.profile.bundles，然后重启 Harness
-```
+## 它是什么
 
-需要 DSH `>=0.2.2-rc.1`。三条命令之外没有别的配置；面板在左侧栏「角色」。
+装上之后，左侧栏多一个「角色」。每个角色有自己的用户画像、自己的笔记、自己的主题库；
+会话开始时它们进入提示词，回合结束后自动复盘把新事实写回去——你不用再提醒它"记住这个"。
 
-- **记得住**：会话开始注入画像与笔记，写得进、查得到、能改能删，历史留档不硬删。
-- **不膨胀**：一条一个事实（≤120 字），写满自动转存主题；常驻 ≥90% 时在复盘后自动整理。
-- **看得见**：`pnpm health` 报告召回是否真的注入了、`pnpm audit` 查记忆结构、`pnpm probe` 用量化题集量检索质量。
+它替你做四件事：
+
+- **记住你**：称呼、习惯、忌讳、协作方式，一次说清，之后每轮都在。
+- **分清项目**：一个角色一份记忆，项目 A 的约定不会跑到项目 B 里去。
+- **自己整理**：一条一个事实，写满自动转到主题库，常驻层不会越用越长。
+- **让你审**：所有条目在面板里可改可删；写成什么样、什么时候写的，复盘记录里都有。
 
 ![用户画像](docs/preview-profile.png)
 
-> npm 上的 `dsh-persona` 是**别人占的名字**（`0.0.1`，描述写着 name reserved），本仓库没有发布到 npm，请从 git 安装。
-
-A persona-memory plugin for DeepSeek Harness: per-persona long-term memory with two
-resident tiers, a topic library, and a per-turn review that writes without being asked.
-
-## 安装
-
-**从仓库装（推荐）**
+## 快速开始
 
 ```sh
+# 1. 安装
 dsh plugin --profile <profile> add github:TBAOT/dsh-persona
+
+# 2. 把 dsh-persona 加进 profile 的 dsh.profile.bundles，然后重启 Harness
 ```
 
-**本地开发**：clone 后把链接写进 profile
+3. 打开左侧栏「角色」→ 新建角色 → 把工作区绑给它。
+4. 正常聊天。下一次回合结束，记忆就开始长起来了。
+
+需要 DSH `>=0.2.2-rc.1`。除此之外没有必填配置。
+
+## 面板
+
+| 页签 | 用来做什么 |
+|---|---|
+| 角色记忆 | 编辑这一角色的笔记；页脚显示用量/上限与最近一次的召回读数 |
+| 用户画像 | 编辑"你是谁、你要什么"；和上面的笔记分开存 |
+| 复盘记录 | 每次自动写入/拒绝的明细：改了什么、用了哪个模型、为什么没写 |
+| 技能 | 这个角色独有的技能（SKILL.md），别的角色看不到 |
+| 工作区 | 把目录绑给角色；该目录及子目录下的会话自动归它 |
+
+页签行右侧的 `只读 画像 笔记 主题` 是护栏：点一下设为只读，agent 就写不进那一档，你仍然可以在面板里改。
+
+## 常用命令
 
 ```sh
-dsh plugin --profile <profile> add link:C:/path/to/dsh-persona
+pnpm health    # 最近几轮召回是否真的注入了、token 花了多少
+pnpm audit     # 记忆结构体检：空摘要、超长、近似重复、跨档重复、策略一致性
+pnpm probe     # 用 14 道真实问题量检索质量（命中率 / 注入字数 / 耗时）
 ```
-
-装完后把 `dsh-persona` 加进 profile 的 `dsh.profile.bundles` 列表，重启 Harness。
-
-## 面板（左侧栏「角色」）
-
-装好并启用后，左栏底部多一个「角色」图标，点开是整页面板：
-
-- **左侧**：角色列表（名字、槽位 id、绑定工作区数量）
-- **记忆**：两档编辑器（用户画像 / 角色笔记），带用量与上限，超限会被拒绝
-- **复盘记录**：最近 30 条，含模型、写入/拒绝、跳过原因
-- **工作区**：下拉就是应用里已有的工作区（标题、路径、会话数、已属于哪个角色），选中即绑定；也可以手动填一个子目录路径（该目录必须真实存在）。绑定后该目录及其子目录下的会话自动归这个角色。
-
-角色是**槽位制**：包里声明 4 个槽位（`slot-1`…`slot-4`），面板里新建角色就是占用一个空槽，
-名字可以随时改，记忆目录跟着槽位走（改名不丢记忆）。
-
-角色归属由**会话的工作目录**决定，不需要在新建会话时选预设：
-`工作区 → 角色`的映射存在 `<DSH_HOME>/personas/index.json`。
-
-## 每轮复盘（自动写）
-
-回合结束后跑一次模型，读对话摘要 + 当前记忆，返回结构化改动，写入同一套存储。特点：
-
-- **不阻塞回复**：回合关闭后才发起。
-- **不改本轮提示词**：冻结快照属于打开它的那个会话。
-- **逐条可查**：每次写入记在 `<角色>/review/log.jsonl`，含轮次、模型、应用/拒绝原因。
-- **单条超限只拒那条**，其余照写。
-- 模型输出不是合法 JSON 时记 `parse-failed`，不重试、不乱写。
-
-模型来源（按顺序）：插件配置的 `provider` + `model` → 平台默认模型 → 都没有就跳过并记一条警告。
-
-```yaml
-- id: persona-review
-  name: dsh-persona/review
-  config:
-    personaId: default
-    enabled: true
-    everyTurns: 1        # 每 N 轮复盘一次
-    maxTokens: 1200
-    dryRun: false        # true = 只记录不写入，用来观察它想写什么
-    provider: wb-proxy   # 可选；不填则用平台默认模型
-    model: deepseek-v4.1-flash
-```
-
-## 没绑角色的工作区
-
-会话的 cwd 不属于任何角色的工作区时，插件回退到配置里的 `personaId`（默认 `default`）：
-记忆照写、复盘照跑，全部落在 `personas/default/`。这个桶不在名册里，所以它不隔离——
-所有未绑定的项目共用一份。面板把它显示成「未认领池」：能看到里面的原文，也能一键并进
-当前角色（`POST /dsh-persona/api/adopt`；与目标条目去重、超上限整批拒绝、成功后池子清空）。
-
-想彻底避免：把工作区绑到角色，或在面板里给这些目录认领一个角色。
-
-## 私有技能（某角色独有）
-
-把技能放进该角色自己的目录：
-
-```
-<DSH_HOME>/personas/<角色>/skills/
-  <技能名>/SKILL.md      目录式
-  <技能名>.md            平铺式
-```
-
-`SKILL.md` 用 frontmatter 写 `name` 与 `description`（可选 `whenToUse`）。
-
-生效方式：会话开始时，插件只把**本角色**目录下的技能做一个索引（名字 + 说明 + 文件路径）
-注入该会话的提示词；其它角色完全看不到这份索引。需要用到时，模型按给出的路径读全文。
-
-为什么不用平台技能目录：平台技能根是全局的，而补丁里写不了"每个用户各自的绝对路径"；
-换成运行时按角色注入，既不用改配置，也保证了隔离。
-
-共享技能照旧放 `~/.dsh/skills` 或 `~/.agents/skills`，所有角色都能用。
 
 ## 数据在哪
 
 ```
-<DSH_HOME>/personas/<角色>/memory/
-  user.md      用户画像（默认上限 1375 字符）
-  memory.md    角色笔记（默认上限 2200 字符）
-  topics/      预留：按需读取的细节
+~/.dsh/personas/<角色>/
+├─ memory/user.md       用户画像（常驻）
+├─ memory/memory.md     角色笔记（常驻）
+├─ memory/meta.json     条目元数据：hash 链、失效链、时间
+├─ memory/policy.json   只读档与上限（仅面板写，可选）
+├─ topics/              主题库：一篇一个细节，按需读取
+└─ review/              metrics.jsonl / log.jsonl / 备份
 ```
 
-`DSH_HOME` 默认是 `~/.dsh`。文件是普通 Markdown，条目之间用单独一行 `§` 分隔，
-第一行是版本注释，方便以后迁移。可以直接编辑、备份、进版本库。
+工作区与角色的映射在 `~/.dsh/personas/index.json`。
 
-## 为什么冻结
+## 常见问题
 
-记忆在会话开始时读一次，之后整个会话不再变。原因有两个：
+**它会不会记错、把画像写歪？**
+可以在面板里直接改；不放心就把某一档设为只读，agent 从此写不进去，只有你能改。
 
-1. 系统提示词前缀稳定，供应商的前缀缓存才能命中（实测命中率九成以上）；
-2. 会话中途改系统提示会打穿缓存，越聊越贵。
+**会不会把提示词撑爆？**
+常驻层有上限，写满后新增内容转存主题库，常驻层只留结论。单条也有字数上限。
 
-代价是：本会话写入的新记忆，下一个会话才出现在提示词里。工具返回始终显示实时用量。
+**升级 DSH 会不会坏？**
+启动时会探测宿主接口并把结果写进 `pnpm health`；插件初始化失败时只停用它自己，不影响 Harness 启动。
+仓库里还有一条每日巡检，DSH 发布新版本并触及本插件用到的接口时，会开 issue 提醒。
 
-## 工具
+## 深入了解
 
-模型通过 `memory` 工具维护记忆：
-
-| 操作 | 行为 |
-|---|---|
-| `add` | 追加一条；与已有条目完全重复会被拒绝 |
-| `patch` | 用 `old_text` 定位唯一片段并替换 |
-| `remove` | 用 `old_text` 定位并删除整条 |
-
-- 必须指定 `target`：`user` 或 `memory`。
-- 一次调用可带多条 `operations`，按顺序执行，**最终**结果必须在上限内。
-- 超限时整批拒绝，并回显现有条目与还差多少字符——请先合并或删除，再添加。
-- 写入前会检查不可见 Unicode 字符与疑似密钥/私钥，命中即拒绝。
+- [docs/guide.md](docs/guide.md) —— 原理、配置项、容量规则、已知限制（想弄明白"为什么这样设计"看这份）
+- [CHANGELOG.md](CHANGELOG.md) —— 每个版本改了什么
+- [Releases](https://github.com/TBAOT/dsh-persona/releases) —— 安装包（含文档与截图）
 
 ## 从 soul-md 迁移
 
-如果之前用过 `dsh-soul-md`，它的人设卡与记忆可以整包搬过来（源数据不动，可重复运行）：
-
 ```sh
-node scripts/migrate-soul-md.mjs --persona slot-1 \
-  --patch ~/.dsh/profiles/<profile>/cordis.patch.yml
+node scripts/migrate-soul-md.mjs --soul-md <$DSH_HOME/soul-md> --persona <角色>
+# 旧配置里还留着 soul-md 的，也可以：--patch <profile/cordis.patch.yml>
 ```
 
-规则：
-
-- 每张卡片 → `personas/<角色>/skills/<卡片名>/SKILL.md`（按需读取，不占记忆预算）
-- soul-md 的记忆文件 → 记忆条目；放不下的转成技能笔记文件，不会丢内容
-- 重复运行会覆盖同名技能、跳过重复条目
-
-## 配置
-
-```yaml
-- id: persona-memory
-  name: dsh-persona
-  config:
-    personaId: default     # 角色 id，决定记忆目录
-    userLimit: 1375        # 用户画像上限（字符）
-    memoryLimit: 2200      # 角色笔记上限（字符）
-    inject: true           # 关掉则只保留工具、不注入提示词
-    userTitle: 用户画像 / USER PROFILE
-    memoryTitle: 长期记忆 / MEMORY
-```
-
-一个角色 = 一个 `personaId` = 一份记忆。想让多个角色各自独立，为每个角色挂一行
-`dsh-persona`，给不同的 `personaId`。构建者也可以把它挂进各自角色的预设里。
-
-其余可调项（都在同一行 config 下）：`topics` 关掉主题库、`topicsIndexLimit` 索引字符上限（默认 600）、
-`topicTtlDays` 主题多久不更新就不再注入（默认 90，0 关闭）、`recallTopN` 每轮召回几篇摘要（默认 3，0 关闭）、
-`recallBudget` 召回块字符预算（默认 400）、`routeThreshold` 常驻到这个比例就把 add 转存主题（默认 0.9）、
-`addOverflow: reject` 改回硬拒绝；`consolidate` 关掉复盘后的后台整理轮（默认开）、`consolidateThreshold`
-它在哪个占用比之后动手（默认 0.9）、`consolidateCooldownMs` 两次整理的最小间隔（默认 30 分钟）。
-
-**常驻条目是「一条一个事实、不超过 120 字」**：对话轮只做精确编辑（add/patch/remove），整层重写
-（`rethink`）不给对话轮用，只由复盘后的后台整理轮调用——照 Letta 把 `memory_rethink` 留给 sleep-time 的做法。
-
-## 检索与评测
-
-- 打分：主题的 `slug + summary + keywords` 组成 head（占 0.7），正文占 0.3；CJK 按 2-gram，拉丁按词；
-  再乘上按主题库统计的 IDF 权重，压掉「记忆」「dsh」这类到处都有的词。
-- 主题 front matter 支持一行别名：`keywords: 权限备份,能不能删`。别名只参与打分，不占提示词里的索引字符，
-  用来接住「换个词问同一件事」的召回。
-- 评测：`pnpm probe --persona=slot-1 --split=tune|verify`，报三个数——命中率、平均注入字符、平均耗时，
-  并按 single-hop / multi-hop / temporal / negative 分类。题目在 `test/probe/questions.json`，
-  全部取自真实会话里的用户原话，`holdout` 与调参集分开跑，负例被误召回时退出码非零。
-- 2026-11-15 基线（slot-1，14 题）：tune 89%（8/9）、verify 100%（5/5）、平均注入 177 字符。
-- 已知局限：很长很口语的问题会把分数稀释（覆盖率按查询长度归一），这类查询仍可能漏。
-
-## 体检
-
-`pnpm health` 读每个角色最近的 `review/metrics.jsonl`，一条命令回答「召回现在有没有在跑」：
-
-```
-[slot-1] 近 5 轮：注入 3 次（injected×3 no-match×2）
-   tokens in/out：4976/1344
-   最近：turn 9 @ 2026-11-15T10:03:39+08:00 → ok
-```
-
-判定 `ok` / `broken`（形状或异常失败）/ `silent`（该注入却一次没注入）/ `unverified`（每条都记成 unknown，
-无法归属轮次）/ `stale`（最近没活动）。只有 `broken` 与 `silent` 退出码非零。
-
-`pnpm audit` 查的是记忆库本身的结构：空摘要主题、超限主题、近似重复主题、档内或跨档的重复事实、
-meta 与文件不一致——这些算错误（退出码非零）；缺检索别名、条目超长、某一档已近上限只算提醒，
-因为"这条值不值得留"得由人判断。
-
-## 升级后怎么确认生效
-
-插件的代码只有重载/重启后才进内存（本机 `link:` 安装时尤其如此），所以升级完按这三步验：
-
-1. `pnpm health`（或 `node scripts/health.mjs`）：看 verdict，`ok` 说明最近窗口里召回真注入了；
-2. 随便发一句话，再看 `<DSH_HOME>/personas/<角色>/review/metrics.jsonl` 最后一行：
-   - `recall.outcome` 应是 `injected` / `no-match` / `trivial` 之一，**不该是 `unknown`**；
-   - `recall.chars` 大于 0 表示这次确实把主题塞进了提示词；
-   - `tokens.in/out` 非零表示计量拿到了真实用量（`usageMissing: true` 则是流里没有 usage 块）。
-3. 若 verdict 是 `silent` 或 `broken`，先看同一行里的 `recall.error`，再去查 `lib/recall.js` 的注入路径。
+把 soul-md 的卡片与记忆搬进当前结构；超出上限的条目会跳过并在结果里列出来。
 
 ## 隐私
 
-- 记忆是本地明文文件，不会上传到任何地方。
-- 只有模型调用时，注入的那部分文本会随提示词发给**你自己配置的模型供应商**。
-- 插件本身不联网。
+记忆全部存在本机 `~/.dsh/personas/`，不上传。例外只有一处：每轮复盘会把对话摘要发给模型，
+用的是 Harness 里配置的模型（默认模型或插件行里指定的 provider/model）。不想让它发给模型就把
+`config.enabled` 设为 `false`，记忆仍可手动编辑。
 
 ## 接口的安全边界
 
-面板接口只服务本机：要求固定请求头 `x-dsh-persona: 1`，并拒绝非 loopback 的 `Host`、跨站 `Origin`
-和预检请求（`OPTIONS`）。**这不是身份认证**——本机任意进程仍能带头发请求，所以不要把这台机器的
-DSH Web 端口暴露到不受信网络。
+面板的 HTTP 接口只监听本机回环，并且要求 `x-dsh-persona: 1` 请求头——这是**防误触**，不是身份认证。
+不要把端口暴露到局域网。
 
 ## 卸载
 
-从 bundles 列表移除并卸载包即可。`<DSH_HOME>/personas/` 下的数据不会删除，可自行备份或清理。
+```sh
+dsh plugin --profile <profile> remove dsh-persona
+```
+
+角色记忆目录不会被删除；不需要了再手动删 `~/.dsh/personas/<角色>`。
 
 ## 许可
 
