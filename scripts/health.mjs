@@ -13,6 +13,7 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { summarizeMetrics, formatHealth } from '../lib/health.js'
+import { readCompatSync } from '../lib/compat.js'
 
 const DSH_HOME = process.env.DSH_HOME || path.join(os.homedir(), '.dsh')
 const arg = (name) => process.argv.find((item) => item.startsWith(`--${name}=`))?.split('=')[1]
@@ -63,6 +64,23 @@ for (const persona of personas) {
 if (!checked) {
   console.log(`没有可评估的 metrics（${path.join(personasDir, '*', 'review', 'metrics.jsonl')}）`)
   process.exit(0)
+}
+// Host compatibility, written by the plugin at apply() time.
+const compat = readCompatSync(DSH_HOME ? { ...process.env, DSH_HOME } : process.env)
+if (compat) {
+  const missing = compat.missing ?? []
+  const degraded = compat.degraded ?? []
+  const version = compat.package ?? '?'
+  console.log(
+    `\n宿主兼容：插件 ${version} · ${missing.length ? `缺必需接口 ${missing.join('、')}` : '必需接口齐全'}` +
+      `${degraded.length ? ` · 降级 ${degraded.join('、')}` : ''} · 召回走 ${compat.recallMode ?? '?'}（${compat.at ?? ''}）`,
+  )
+  if (missing.length) {
+    console.error('失败：宿主缺少必需接口，插件无法正常工作——这通常意味着 DSH 做了不兼容升级。')
+    process.exit(1)
+  }
+} else {
+  console.log('\n宿主兼容：还没有探测结果（插件未在本进程加载过，或从未重载）。')
 }
 if (failed.length) {
   console.error(`\n失败：${failed.map((item) => `${item.persona}=${item.verdict}`).join('，')}`)
