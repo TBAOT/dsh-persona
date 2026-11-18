@@ -29,6 +29,14 @@ test('empty file parses to no entries', () => {
   assert.deepEqual(parseEntries('<!-- dsh-persona-kit v1 target=user -->\n'), [])
 })
 
+test('a header from before the 0.12.0 rename is not read back as an entry', () => {
+  // Renaming the package changed HEADER_PREFIX; files written by older versions still
+  // start with `<!-- dsh-persona v1 …`. If the parser only knew the new prefix, every
+  // such file would gain a junk entry, and an empty tier would look like one fact.
+  assert.deepEqual(parseEntries('<!-- dsh-persona v1 target=user -->'), [])
+  assert.deepEqual(parseEntries('<!-- dsh-persona v1 target=memory -->\n项目用 pnpm'), ['项目用 pnpm'])
+})
+
 test('add rejects exact duplicate', () => {
   const first = applyOperation([], { action: 'add', content: '偏好简洁回答' })
   assert.equal(first.ok, true)
