@@ -26,71 +26,70 @@ test('garbage registry content falls back to an empty index', () => {
   assert.deepEqual(readIndexFrom('{"personas":"nope"}').personas, [])
 })
 
-test('creating a persona allocates the next free slot', () => {
+test('a persona id is the name you gave it', () => {
   const first = createPersona(empty(), { name: '码趣项目' })
   assert.equal(first.ok, true)
-  assert.equal(first.persona.id, 'slot-1')
-  assert.equal(first.persona.presetId, 'persona-slot-1')
-  const second = createPersona(first.index, { name: '另一个' })
-  assert.equal(second.persona.id, 'slot-2')
+  assert.equal(first.persona.id, '码趣项目')
+  assert.equal(first.persona.presetId, 'persona-码趣项目')
+  const second = createPersona(first.index, { name: 'Another' })
+  assert.equal(second.persona.id, 'another')
 })
 
-test('slots run out at the declared count', () => {
+test('a duplicate name gets a suffix instead of a slot number', () => {
+  const first = createPersona(empty(), { name: '项目' })
+  const second = createPersona(first.index, { name: '项目' })
+  assert.equal(second.ok, true)
+  assert.equal(second.persona.id, '项目-2')
+})
+
+test('personas run out at the declared count', () => {
   let index = empty()
-  for (let slot = 1; slot <= SLOT_COUNT; slot += 1) {
-    const result = createPersona(index, { name: `角色${slot}` })
+  for (let n = 1; n <= SLOT_COUNT; n += 1) {
+    const result = createPersona(index, { name: `角色${n}` })
     assert.equal(result.ok, true)
     index = result.index
   }
   const overflow = createPersona(index, { name: '多余' })
   assert.equal(overflow.ok, false)
-  assert.match(overflow.error, /用满/)
-})
-
-test('an explicitly requested slot is honoured and cannot be taken twice', () => {
-  const first = createPersona(empty(), { name: 'A', slot: 3 })
-  assert.equal(first.persona.id, 'slot-3')
-  const clash = createPersona(first.index, { name: 'B', slot: 3 })
-  assert.equal(clash.ok, false)
-  assert.match(clash.error, /已被占用/)
+  assert.match(overflow.error, /角色已满/)
 })
 
 test('workspace binding resolves nested cwd, case and slash form', () => {
   let index = createPersona(empty(), { name: 'Work' }).index
-  index = bindWorkspace(index, 'slot-1', 'C:\\A\\work\\proj').index
-  assert.equal(resolvePersonaForCwd(index, 'C:\\A\\work\\proj\\src')?.id, 'slot-1')
-  assert.equal(resolvePersonaForCwd(index, 'c:/a/WORK/proj/sub')?.id, 'slot-1')
+  index = bindWorkspace(index, 'work', 'C:\\A\\work\\proj').index
+  assert.equal(resolvePersonaForCwd(index, 'C:\\A\\work\\proj\\src')?.id, 'work')
+  assert.equal(resolvePersonaForCwd(index, 'c:/a/WORK/proj/sub')?.id, 'work')
   assert.equal(resolvePersonaForCwd(index, 'C:\\A\\work\\other'), undefined)
 })
 
 test('the most specific workspace wins', () => {
   let index = createPersona(empty(), { name: 'Outer' }).index
   index = createPersona(index, { name: 'Inner' }).index
-  index = bindWorkspace(index, 'slot-1', 'C:\\A\\work').index
-  index = bindWorkspace(index, 'slot-2', 'C:\\A\\work\\deep').index
-  assert.equal(resolvePersonaForCwd(index, 'C:\\A\\work\\deep\\plugins')?.id, 'slot-2')
-  assert.equal(resolvePersonaForCwd(index, 'C:\\A\\work\\other')?.id, 'slot-1')
+  index = bindWorkspace(index, 'outer', 'C:\\A\\work').index
+  index = bindWorkspace(index, 'inner', 'C:\\A\\work\\deep').index
+  assert.equal(resolvePersonaForCwd(index, 'C:\\A\\work\\deep\\plugins')?.id, 'inner')
+  assert.equal(resolvePersonaForCwd(index, 'C:\\A\\work\\other')?.id, 'outer')
 })
 
 test('rebinding a workspace moves it off the previous persona', () => {
   let index = createPersona(empty(), { name: 'A' }).index
   index = createPersona(index, { name: 'B' }).index
-  index = bindWorkspace(index, 'slot-1', 'C:\\proj').index
-  index = bindWorkspace(index, 'slot-2', 'C:\\proj').index
-  assert.deepEqual(index.personas.find((entry) => entry.id === 'slot-1').workspaces, [])
-  assert.deepEqual(index.personas.find((entry) => entry.id === 'slot-2').workspaces, ['C:\\proj'])
+  index = bindWorkspace(index, 'a', 'C:\\proj').index
+  index = bindWorkspace(index, 'b', 'C:\\proj').index
+  assert.deepEqual(index.personas.find((entry) => entry.id === 'a').workspaces, [])
+  assert.deepEqual(index.personas.find((entry) => entry.id === 'b').workspaces, ['C:\\proj'])
 })
 
 test('unbind, update and delete', () => {
   let index = createPersona(empty(), { name: 'A' }).index
-  index = bindWorkspace(index, 'slot-1', 'C:\\proj').index
-  index = unbindWorkspace(index, 'slot-1', 'c:/proj').index
+  index = bindWorkspace(index, 'a', 'C:\\proj').index
+  index = unbindWorkspace(index, 'a', 'c:/proj').index
   assert.deepEqual(index.personas[0].workspaces, [])
-  index = updatePersona(index, 'slot-1', { name: '改名后' }).index
+  index = updatePersona(index, 'a', { name: '改名后' }).index
   assert.equal(index.personas[0].name, '改名后')
-  index = updatePersona(index, 'slot-1', { homeSessionId: 'session-1' }).index
+  index = updatePersona(index, 'a', { homeSessionId: 'session-1' }).index
   assert.equal(index.personas[0].homeSessionId, 'session-1')
-  index = deletePersona(index, 'slot-1').index
+  index = deletePersona(index, 'a').index
   assert.equal(index.personas.length, 0)
 })
 
@@ -265,7 +264,7 @@ test('api creates, lists and resolves personas', async () => {
     })
     assert.equal(created.status, 200)
     const id = created.body.persona.id
-    assert.equal(id, 'slot-1')
+    assert.equal(id, '码趣项目')
 
     await callApi(call, {
       method: 'POST',
@@ -298,7 +297,7 @@ test('binding refuses a path that is not a directory', async () => {
       method: 'POST',
       url: '/dsh-persona-kit/api/bind',
       headers,
-      body: { id: 'slot-1', workspace: path.join(home, 'nope') },
+      body: { id: '甲', workspace: path.join(home, 'nope') },
     })
     assert.equal(refused.status, 400)
     assert.match(refused.body.error, /目录不存在/)
@@ -343,19 +342,19 @@ test('the app workspace list is offered for binding, with owners marked', async 
       method: 'POST',
       url: '/dsh-persona-kit/api/bind',
       headers,
-      body: { id: 'slot-1', workspaceId: 'w1' },
+      body: { id: '甲角色', workspaceId: 'w1' },
     })
     assert.equal(bound.status, 200)
 
     const after = await callApi(call, { url: '/dsh-persona-kit/api/workspaces', headers })
-    assert.equal(after.body.workspaces.find((item) => item.id === 'w1').boundTo, 'slot-1')
+    assert.equal(after.body.workspaces.find((item) => item.id === 'w1').boundTo, '甲角色')
     assert.equal(after.body.workspaces.find((item) => item.id === 'w1').boundName, '甲角色')
 
     const unknown = await callApi(call, {
       method: 'POST',
       url: '/dsh-persona-kit/api/bind',
       headers,
-      body: { id: 'slot-1', workspaceId: 'nope' },
+      body: { id: '甲角色', workspaceId: 'nope' },
     })
     assert.equal(unknown.status, 400)
   })
@@ -371,12 +370,12 @@ test('beyond the persona limit, adoption is refused without touching either side
       method: 'POST',
       url: '/dsh-persona-kit/api/limits',
       headers,
-      body: { id: 'slot-1', target: 'memory', limit: 200 },
+      body: { id: '甲', target: 'memory', limit: 200 },
     })
     const poolFile = path.join(home, 'personas', 'default', 'memory', 'memory.md')
     await mkdir(path.dirname(poolFile), { recursive: true })
     await writeFile(poolFile, `<!-- dsh-persona-kit v1 target=memory -->\n${'长'.repeat(260)}\n`, 'utf8')
-    const targetFile = path.join(home, 'personas', 'slot-1', 'memory', 'memory.md')
+    const targetFile = path.join(home, 'personas', '甲', 'memory', 'memory.md')
     await mkdir(path.dirname(targetFile), { recursive: true })
     await writeFile(targetFile, '<!-- dsh-persona-kit v1 target=memory -->\n', 'utf8')
 
@@ -384,7 +383,7 @@ test('beyond the persona limit, adoption is refused without touching either side
       method: 'POST',
       url: '/dsh-persona-kit/api/adopt',
       headers,
-      body: { id: 'slot-1' },
+      body: { id: '甲' },
     })
     assert.equal(refused.status, 400)
     assert.equal(refused.body.tier, 'memory')
@@ -415,7 +414,7 @@ test('adoption merges the pool into a persona, dedupes, and empties it', async (
       'utf8',
     )
 
-    const ownDir = path.join(home, 'personas', 'slot-1', 'memory')
+    const ownDir = path.join(home, 'personas', '甲', 'memory')
     await mkdir(ownDir, { recursive: true })
     await writeFile(
       path.join(ownDir, 'memory.md'),
@@ -433,7 +432,7 @@ test('adoption merges the pool into a persona, dedupes, and empties it', async (
       method: 'POST',
       url: '/dsh-persona-kit/api/adopt',
       headers,
-      body: { id: 'slot-1' },
+      body: { id: '甲' },
     })
     assert.equal(adopted.status, 200)
     assert.deepEqual(adopted.body.added, { user: 1, memory: 1 })
@@ -502,11 +501,11 @@ test('the turn endpoint matches by turn number, and by seq within one step', asy
     const headers = { 'x-dsh-persona-kit': '1' }
     await callApi(call, { method: 'POST', url: '/dsh-persona-kit/api/create', headers, body: { name: '甲' } })
 
-    const dir = path.join(home, 'personas', 'slot-1', 'review')
+    const dir = path.join(home, 'personas', '甲', 'review')
     await mkdir(dir, { recursive: true })
     const records = [
-      { at: 't1', sessionId: 's1', persona: 'slot-1', status: 'written', turn: 2, seq: 10, applied: [{ target: 'memory', count: 1 }] },
-      { at: 't2', sessionId: 's1', persona: 'slot-1', status: 'written', turn: 3, seq: 20, applied: [{ target: 'memory', count: 2 }] },
+      { at: 't1', sessionId: 's1', persona: '甲', status: 'written', turn: 2, seq: 10, applied: [{ target: 'memory', count: 1 }] },
+      { at: 't2', sessionId: 's1', persona: '甲', status: 'written', turn: 3, seq: 20, applied: [{ target: 'memory', count: 2 }] },
     ]
     await writeFile(dir + path.sep + 'log.jsonl', records.map((item) => JSON.stringify(item)).join('\n') + '\n', 'utf8')
 
@@ -533,13 +532,13 @@ test('skills can be listed and moved between personas', async () => {
     await callApi(call, { method: 'POST', url: '/dsh-persona-kit/api/create', headers, body: { name: '甲' } })
     await callApi(call, { method: 'POST', url: '/dsh-persona-kit/api/create', headers, body: { name: '乙' } })
 
-    const dirSkill = path.join(home, 'personas', 'slot-1', 'skills', 'alpha', 'SKILL.md')
+    const dirSkill = path.join(home, 'personas', '甲', 'skills', 'alpha', 'SKILL.md')
     await mkdir(path.dirname(dirSkill), { recursive: true })
     await writeFile(dirSkill, '---\nname: alpha\ndescription: 目录式技能\n---\n\nbody\n', 'utf8')
-    const flatSkill = path.join(home, 'personas', 'slot-1', 'skills', 'beta.md')
+    const flatSkill = path.join(home, 'personas', '甲', 'skills', 'beta.md')
     await writeFile(flatSkill, '---\nname: beta\ndescription: 平铺技能\n---\n', 'utf8')
 
-    const listed = await callApi(call, { url: '/dsh-persona-kit/api/skills?id=slot-1', headers })
+    const listed = await callApi(call, { url: '/dsh-persona-kit/api/skills?id=甲', headers })
     assert.equal(listed.status, 200)
     assert.deepEqual(listed.body.skills.map((item) => item.name), ['alpha', 'beta'])
     assert.equal(listed.body.skills[0].kind, 'dir')
@@ -550,19 +549,19 @@ test('skills can be listed and moved between personas', async () => {
       method: 'POST',
       url: '/dsh-persona-kit/api/skills/move',
       headers,
-      body: { from: 'slot-1', to: 'slot-2', path: flatSkill },
+      body: { from: '甲', to: '乙', path: flatSkill },
     })
     assert.equal(moved.status, 200)
-    assert.match(moved.body.path, /slot-2/)
+    assert.match(moved.body.path, /[\\/]乙[\\/]/)
 
-    const after = await callApi(call, { url: '/dsh-persona-kit/api/skills?id=slot-2', headers })
+    const after = await callApi(call, { url: '/dsh-persona-kit/api/skills?id=乙', headers })
     assert.deepEqual(after.body.skills.map((item) => item.name), ['beta'])
 
     const escape = await callApi(call, {
       method: 'POST',
       url: '/dsh-persona-kit/api/skills/move',
       headers,
-      body: { from: 'slot-1', to: 'slot-2', path: path.join(home, 'personas', 'index.json') },
+      body: { from: '甲', to: '乙', path: path.join(home, 'personas', 'index.json') },
     })
     assert.equal(escape.status, 400)
     assert.match(escape.body.error, /技能目录/)
@@ -584,16 +583,16 @@ test('memory can be read and written through the panel api', async () => {
       method: 'POST',
       url: '/dsh-persona-kit/api/memory',
       headers,
-      body: { id: 'slot-1', target: 'memory', content: '第一条\n\n§\n\n第二条' },
+      body: { id: '角色一', target: 'memory', content: '第一条\n\n§\n\n第二条' },
     })
     assert.equal(written.status, 200)
     assert.equal(written.body.usage.used > 0, true)
 
-    const read = await callApi(call, { url: '/dsh-persona-kit/api/memory?id=slot-1&target=memory', headers })
+    const read = await callApi(call, { url: '/dsh-persona-kit/api/memory?id=角色一&target=memory', headers })
     assert.deepEqual(read.body.entries, ['第一条', '第二条'])
     assert.equal(read.body.usage.limit, 2200)
 
-    const file = path.join(home, 'personas', 'slot-1', 'memory', 'memory.md')
+    const file = path.join(home, 'personas', '角色一', 'memory', 'memory.md')
     const text = await readFile(file, 'utf8')
     assert.match(text, /^<!-- dsh-persona-kit v1 target=memory -->/)
   })
@@ -610,7 +609,7 @@ test('panel api refuses an over-limit memory write', async () => {
       method: 'POST',
       url: '/dsh-persona-kit/api/memory',
       headers,
-      body: { id: 'slot-1', target: 'user', content: 'x'.repeat(2000) },
+      body: { id: '角色一', target: 'user', content: 'x'.repeat(2000) },
     })
     assert.equal(result.status, 400)
     assert.match(result.body.error, /超出上限/)
@@ -624,7 +623,7 @@ test('review log is returned newest-last', async () => {
     const headers = { 'x-dsh-persona-kit': '1' }
     await callApi(call, { method: 'POST', url: '/dsh-persona-kit/api/create', headers, body: { name: '角色一' } })
 
-    const dir = path.join(home, 'personas', 'slot-1', 'review')
+    const dir = path.join(home, 'personas', '角色一', 'review')
     await mkdir(dir, { recursive: true })
     await writeFile(
       path.join(dir, 'log.jsonl'),
@@ -632,7 +631,7 @@ test('review log is returned newest-last', async () => {
       'utf8',
     )
 
-    const listed = await callApi(call, { url: '/dsh-persona-kit/api/review?id=slot-1&limit=10', headers })
+    const listed = await callApi(call, { url: '/dsh-persona-kit/api/review?id=角色一&limit=10', headers })
     assert.equal(listed.body.records.length, 1)
     assert.equal(listed.body.records[0].note, 'no-ops')
   })
@@ -645,26 +644,26 @@ test('each persona can carry its own memory limit', async () => {
     const headers = { 'x-dsh-persona-kit': '1' }
     await callApi(call, { method: 'POST', url: '/dsh-persona-kit/api/create', headers, body: { name: '角色一' } })
 
-    const before = await callApi(call, { url: '/dsh-persona-kit/api/memory?id=slot-1&target=user', headers })
+    const before = await callApi(call, { url: '/dsh-persona-kit/api/memory?id=角色一&target=user', headers })
     assert.equal(before.body.usage.limit, 1375)
 
     const changed = await callApi(call, {
       method: 'POST',
       url: '/dsh-persona-kit/api/limits',
       headers,
-      body: { id: 'slot-1', target: 'user', limit: 300 },
+      body: { id: '角色一', target: 'user', limit: 300 },
     })
     assert.equal(changed.status, 200)
     assert.equal(changed.body.limits.user, 300)
 
-    const after = await callApi(call, { url: '/dsh-persona-kit/api/memory?id=slot-1&target=user', headers })
+    const after = await callApi(call, { url: '/dsh-persona-kit/api/memory?id=角色一&target=user', headers })
     assert.equal(after.body.usage.limit, 300)
 
     const tooBig = await callApi(call, {
       method: 'POST',
       url: '/dsh-persona-kit/api/memory',
       headers,
-      body: { id: 'slot-1', target: 'user', content: 'x'.repeat(400) },
+      body: { id: '角色一', target: 'user', content: 'x'.repeat(400) },
     })
     assert.equal(tooBig.status, 400)
     assert.match(tooBig.body.error, /超出上限：400\/300/)
@@ -681,7 +680,7 @@ test('a limit outside the sane range is refused', async () => {
       method: 'POST',
       url: '/dsh-persona-kit/api/limits',
       headers,
-      body: { id: 'slot-1', target: 'user', limit: 50 },
+      body: { id: '角色一', target: 'user', limit: 50 },
     })
     assert.equal(bad.status, 400)
     assert.match(bad.body.error, /200–20000/)
@@ -694,7 +693,7 @@ test('a session id resolves its persona through the cached workspace path', asyn
     apply(ctx, {})
     const headers = { 'x-dsh-persona-kit': '1' }
     await callApi(call, { method: 'POST', url: '/dsh-persona-kit/api/create', headers, body: { name: '甲' } })
-    await callApi(call, { method: 'POST', url: '/dsh-persona-kit/api/bind', headers, body: { id: 'slot-1', workspace: home } })
+    await callApi(call, { method: 'POST', url: '/dsh-persona-kit/api/bind', headers, body: { id: '甲', workspace: home } })
 
     const dir = path.join(home, 'storages', 'session_projcache', 'sessions')
     await mkdir(dir, { recursive: true })
@@ -707,7 +706,7 @@ test('a session id resolves its persona through the cached workspace path', asyn
     const resolved = await callApi(call, { url: '/dsh-persona-kit/api/resolve?session=session-abc', headers })
     assert.equal(resolved.status, 200)
     assert.equal(resolved.body.cwd, home)
-    assert.equal(resolved.body.persona.id, 'slot-1')
+    assert.equal(resolved.body.persona.id, '甲')
 
     const missing = await callApi(call, { url: '/dsh-persona-kit/api/resolve?session=../evil', headers })
     assert.equal(missing.body.persona, null)
@@ -724,23 +723,23 @@ test('topics can be written through the panel api, and stats reports them', asyn
       method: 'POST',
       url: '/dsh-persona-kit/api/topics',
       headers,
-      body: { id: 'slot-1', slug: 'printer', summary: '打印机排查', content: '现象：队列为空' },
+      body: { id: '甲', slug: 'printer', summary: '打印机排查', content: '现象：队列为空' },
     })
     assert.equal(written.status, 200)
     assert.equal(written.body.slug, 'printer')
 
-    const stats = await callApi(call, { url: '/dsh-persona-kit/api/memory/stats?id=slot-1', headers })
+    const stats = await callApi(call, { url: '/dsh-persona-kit/api/memory/stats?id=甲', headers })
     assert.equal(stats.status, 200)
     assert.equal(stats.body.topics.count, 1)
     assert.equal(typeof stats.body.resident.memory.used, 'number')
     assert.equal(typeof stats.body.drift.rebuilt, 'boolean')
 
-    const manifestPath = path.join(home, 'personas', 'slot-1', 'memory', 'index', 'manifest.json')
+    const manifestPath = path.join(home, 'personas', '甲', 'memory', 'index', 'manifest.json')
     await rm(manifestPath, { force: true })
-    const healed = await callApi(call, { url: '/dsh-persona-kit/api/memory/stats?id=slot-1', headers })
+    const healed = await callApi(call, { url: '/dsh-persona-kit/api/memory/stats?id=甲', headers })
     assert.equal(healed.body.drift.rebuilt, true)
 
-    const manifest = path.join(home, 'personas', 'slot-1', 'memory', 'index', 'manifest.json')
+    const manifest = path.join(home, 'personas', '甲', 'memory', 'index', 'manifest.json')
     assert.match(await readFile(manifest, 'utf8'), /printer/)
   })
 })
@@ -751,7 +750,7 @@ test('history lists what was invalidated or expired, and can show everything', a
     const headers = { 'x-dsh-persona-kit': '1' }
     await callApi(call, { method: 'POST', url: '/dsh-persona-kit/api/create', headers, body: { name: '甲' } })
 
-    const dir = path.join(home, 'personas', 'slot-1', 'memory')
+    const dir = path.join(home, 'personas', '甲', 'memory')
     await mkdir(dir, { recursive: true })
     await writeFile(path.join(dir, 'memory.md'), '<!-- dsh-persona-kit v1 target=memory -->\n仍然有效的条目\n', 'utf8')
     const { entryHash, refreshMeta } = await import('../lib/store.js')
@@ -761,15 +760,15 @@ test('history lists what was invalidated or expired, and can show everything', a
       JSON.stringify({ version: 2, entries: { [oldHash]: { target: 'memory', status: 'active', preview: '被推翻的旧事实' } } }),
       'utf8',
     )
-    await refreshMeta('slot-1', { at: new Date().toISOString(), superseded: { [oldHash]: entryHash('仍然有效的条目') } })
+    await refreshMeta('甲', { at: new Date().toISOString(), superseded: { [oldHash]: entryHash('仍然有效的条目') } })
 
-    const hidden = await callApi(call, { url: '/dsh-persona-kit/api/memory/history?id=slot-1', headers })
+    const hidden = await callApi(call, { url: '/dsh-persona-kit/api/memory/history?id=甲', headers })
     assert.equal(hidden.status, 200)
     assert.equal(hidden.body.count, 1)
     assert.equal(hidden.body.entries[0].status, 'superseded')
     assert.ok(hidden.body.entries[0].supersededBy)
 
-    const all = await callApi(call, { url: '/dsh-persona-kit/api/memory/history?id=slot-1&show=all', headers })
+    const all = await callApi(call, { url: '/dsh-persona-kit/api/memory/history?id=甲&show=all', headers })
     assert.equal(all.body.count, 2)
   })
 })
