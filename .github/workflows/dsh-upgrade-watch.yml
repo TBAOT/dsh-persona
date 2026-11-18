@@ -1,0 +1,41 @@
+name: dsh-upgrade-watch
+
+on:
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # DSH does not adapt plugins; it publishes an upgrade guide per release. This
+      # reads the guides newer than the version we tested against and reports the
+      # items that touch our seams.
+      - id: check
+        continue-on-error: true
+        run: node scripts/check-dsh-upgrade.mjs --out dsh-upgrade-report.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: 打印报告
+        run: cat dsh-upgrade-report.md 2>/dev/null || echo '（没有生成报告，检查脚本可能提前失败）'
+      - name: 命中接缝时开 issue（同日不重复）
+        if: steps.check.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          title="DSH 新版本触及插件接缝（需人工确认）"
+          existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file dsh-upgrade-report.md
+          else
+            gh issue create --title "$title" --body-file dsh-upgrade-report.md
+          fi
