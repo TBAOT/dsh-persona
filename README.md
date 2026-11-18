@@ -2,22 +2,37 @@
 
 [![verify](https://github.com/TBAOT/dsh-persona/actions/workflows/verify.yml/badge.svg)](https://github.com/TBAOT/dsh-persona/actions/workflows/verify.yml)
 
-给 DeepSeek Harness 加"角色记忆"：每个角色两档长期记忆，会话开始时冻结注入，写满会拒绝并要求合并。
+**让 DeepSeek Harness 记住你，并且只记该记的。** 每个角色一份独立记忆：两档常驻（用户画像 + 角色笔记）+ 一个按需读取的主题库；每轮结束自动复盘，不用你说"记住这个"。
 
-A persona-memory plugin for DeepSeek Harness. Two tiers (`user` profile and the
-persona's own `memory` notes), frozen into the prompt at session start, with hard
-character limits and explicit `add` / `patch` / `remove` operations.
+![面板](docs/preview.svg)
+
+```sh
+dsh plugin --profile <profile> add github:TBAOT/dsh-persona
+# 把 dsh-persona 加进 profile 的 dsh.profile.bundles，然后重启 Harness
+```
+
+需要 DSH `>=0.2.2-rc.1`。三条命令之外没有别的配置；面板在左侧栏「角色」。
+
+- **记得住**：会话开始注入画像与笔记，写得进、查得到、能改能删，历史留档不硬删。
+- **不膨胀**：一条一个事实（≤120 字），写满自动转存主题；常驻 ≥90% 时在复盘后自动整理。
+- **看得见**：`pnpm health` 报告召回是否真的注入了、`pnpm audit` 查记忆结构、`pnpm probe` 用量化题集量检索质量。
+
+> npm 上的 `dsh-persona` 是**别人占的名字**（`0.0.1`，描述写着 name reserved），本仓库没有发布到 npm，请从 git 安装。
+
+A persona-memory plugin for DeepSeek Harness: per-persona long-term memory with two
+resident tiers, a topic library, and a per-turn review that writes without being asked.
 
 ## 安装
 
-> 注意：npm 上的 `dsh-persona` 是**别人占的名字**（同名 `0.0.1`，描述写着 name reserved），
-> 本仓库没有发布到 npm。请从 git 安装。
+**从仓库装（推荐）**
 
 ```sh
-# 从仓库装（推荐）
 dsh plugin --profile <profile> add github:TBAOT/dsh-persona
+```
 
-# 或者本地开发：clone 后把链接写进 profile
+**本地开发**：clone 后把链接写进 profile
+
+```sh
 dsh plugin --profile <profile> add link:C:/path/to/dsh-persona
 ```
 

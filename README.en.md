@@ -2,14 +2,32 @@
 
 [![verify](https://github.com/TBAOT/dsh-persona/actions/workflows/verify.yml/badge.svg)](https://github.com/TBAOT/dsh-persona/actions/workflows/verify.yml)
 
-Long-term memory for DeepSeek Harness, organised the way Hermes does it: two
-tiers per persona, frozen into the prompt at session start, plus a per-turn
-review that records what it learned without being asked.
+**DeepSeek Harness remembers you — and only what is worth keeping.** One independent
+memory per persona: two resident tiers (your profile + the persona's own notes) plus a
+topic library read on demand. A per-turn review writes it for you, so you never have to
+say "remember this".
 
-## Install
+![panel](docs/preview.svg)
+
+```sh
+dsh plugin --profile <profile> add github:TBAOT/dsh-persona
+# add dsh-persona to the profile's dsh.profile.bundles, then restart the Harness
+```
+
+Requires DSH `>=0.2.2-rc.1`. No other configuration; the panel lives under “角色” in the
+left sidebar.
+
+- **It remembers**: profile and notes are injected at session start; entries can be added,
+  patched and removed, and history is kept instead of hard-deleted.
+- **It does not bloat**: one fact per entry (≤120 characters); when a tier fills, new
+  facts spill into topics, and a background pass rewrites the tier after the review.
+- **It is measurable**: `pnpm health` says whether recall actually injected, `pnpm audit`
+  checks memory structure, `pnpm probe` scores retrieval against real questions.
 
 > The name `dsh-persona` on npm belongs to someone else (a placeholder `0.0.1`).
 > This repository is not published to npm — install it from git.
+
+## Install
 
 ```sh
 dsh plugin --profile <profile> add github:TBAOT/dsh-persona
