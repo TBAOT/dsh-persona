@@ -181,6 +181,10 @@ curl -H "x-dsh-persona: 1" "http://127.0.0.1:<port>/dsh-persona/api/health?id=sl
 
 **降级不等于坏**：`health` 里看到 `降级 xxx` 说明那条路走了旧的兜底；看到 `缺必需接口` 才是真不兼容。
 
+**为什么 `engines.dsh` 只写下界**（当前 `>=0.2.2-rc.1`，没有上界）：上界会把"可能能用"变成"**肯定不启用**"——DSH 一升级，插件就被判 `incompatible-version`、整个不加载，而你看到的现象是"插件突然失效"。能不能用应当由运行时的接缝探测回答，不由版本号预先判死。
+
+**初始化失败不会拖垮 DSH**：三个插件的 `apply()` 都包了 try/catch，任何异常只记录一条 warn 并让该插件停用（`{disabled: true}`），不会让宿主起不来。最坏情况是"没有记忆功能"，而不是"DSH 打不开"。
+
 **本机是 unmanaged 形态的插件**（不在 bundles 列表里），改完代码 `set_bundle` 只会回 `restart-required`，**必须重启 DSH** 才生效。
 
 ## 10. 已知限制（诚实版）

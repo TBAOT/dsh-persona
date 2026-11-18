@@ -68,6 +68,26 @@ test('the probe survives to disk for the CLI to read', async () => {
   }
 })
 
+test('a failing initialisation is contained, never thrown at the Host', async () => {
+  // A Host that renamed `tools.register` would make the plugin throw while activating;
+  // an exception there can keep DSH from starting. apply() must swallow it instead.
+  const ctx = {
+    logger: { warn() {}, info() {} },
+    on: () => () => {},
+    effect: (fn) => fn(),
+    get tools() {
+      throw new Error('boom: tools seam changed')
+    },
+    systemPrompt: { section: () => () => {}, context: () => () => {} },
+  }
+  let result
+  assert.doesNotThrow(() => {
+    result = applyMemory(ctx, { personaId: 'tester' })
+  })
+  assert.equal(result.disabled, true)
+  assert.match(result.error, /boom/)
+})
+
 test('without runtime context the plugin falls back to the user message', async () => {
   const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-persona-compat-'))
   const previous = process.env.DSH_HOME
