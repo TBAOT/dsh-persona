@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -52,6 +53,30 @@ test('personas run out at the declared count', () => {
   const overflow = createPersona(index, { name: '多余' })
   assert.equal(overflow.ok, false)
   assert.match(overflow.error, /角色已满/)
+})
+
+test('deleting a persona through the api takes its memory to the trash', async () => {
+  await withTempHome(async (home) => {
+    const { ctx, call } = fakeHost()
+    apply(ctx, {})
+    const headers = { 'x-dsh-persona-kit': '1' }
+    const created = await callApi(call, {
+      method: 'POST',
+      url: '/dsh-persona-kit/api/create',
+      headers,
+      body: { name: '待删除' },
+    })
+    const id = created.body.persona.id
+    const memoryDir = path.join(home, 'personas', id, 'memory')
+    await mkdir(memoryDir, { recursive: true })
+    await writeFile(path.join(memoryDir, 'user.md'), '要被一起收走的记忆', 'utf8')
+
+    const deleted = await callApi(call, { method: 'POST', url: '/dsh-persona-kit/api/delete', headers, body: { id } })
+    assert.equal(deleted.status, 200)
+    assert.ok(deleted.body.trashed, '响应里要给出回收站路径')
+    assert.equal(existsSync(path.join(home, 'personas', id)), false, '记忆目录不能留在 personas/ 下')
+    assert.equal(await readFile(path.join(deleted.body.trashed, 'memory', 'user.md'), 'utf8'), '要被一起收走的记忆')
+  })
 })
 
 test('workspace binding resolves nested cwd, case and slash form', () => {

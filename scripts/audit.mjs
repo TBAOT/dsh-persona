@@ -11,6 +11,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { auditPersona, formatAudit } from '../lib/audit.js'
 import { readIndexSync } from '../lib/roster.js'
+import { orphanDirs } from '../lib/migrate.js'
 
 const DSH_HOME = process.env.DSH_HOME || path.join(os.homedir(), '.dsh')
 const personaArg = process.argv.find((item) => item.startsWith('--persona='))?.split('=')[1]
@@ -35,6 +36,14 @@ for (const persona of candidates) {
   console.log(formatAudit(report))
   console.log('')
   errors += report.errors
+}
+
+// 删角色后留下的目录（旧版本只删名册条目）：报出来，用 trash 收走而不是留成孤儿
+const orphans = orphanDirs()
+if (orphans.length) {
+  console.log(`[advisory] orphan-persona-dir — personas/ 下有 ${orphans.length} 个目录不在名册里：`)
+  for (const name of orphans) console.log(`  - ${name}（${path.join(personasDir, name)}）`)
+  console.log('  这些多半是旧版删除角色时留下的；需要就把它移进 ~/.dsh/trash/，不要留在这里冒充角色。\n')
 }
 
 if (!checked) {
