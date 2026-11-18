@@ -21,7 +21,7 @@
 ```
 <DSH_HOME>/personas/
   index.json                角色名册：id、名字、容量上限、绑定的工作区（最长前缀匹配）
-  slot-1/
+  <角色名>/
     memory/user.md          用户画像（谁、偏好、忌讳）
     memory/memory.md        角色笔记（结论、约定、判据）
     memory/meta.json        每条的状态：active / superseded / removed、TTL、失效链
@@ -169,7 +169,7 @@ operations: [{ action: add | patch | remove, content, old_text }]
 
 ```powershell
 pnpm health   # 末尾一行：宿主兼容：插件 0.11.11 · 必需接口齐全 · 召回走 runtime-context
-curl -H "x-dsh-persona-kit: 1" "http://127.0.0.1:<port>/dsh-persona-kit/api/health?id=slot-1"   # 字段 compat
+curl -H "x-dsh-persona-kit: 1" "http://127.0.0.1:<port>/dsh-persona-kit/api/health?id=<角色名>"   # 字段 compat
 ```
 
 | 探测项 | 必需 | 缺了会怎样 |
