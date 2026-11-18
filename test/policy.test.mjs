@@ -8,7 +8,7 @@ import { assertWritable, DEFAULT_POLICY, effectiveLimits, isReadOnly, readPolicy
 import { writeTopic, writeTopicManifest } from '../lib/topics.js'
 
 async function withTempHome(fn) {
-  const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-persona-policy-'))
+  const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-persona-kit-policy-'))
   const previous = process.env.DSH_HOME
   process.env.DSH_HOME = home
   try {

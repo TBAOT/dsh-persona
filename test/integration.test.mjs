@@ -59,7 +59,7 @@ function fakeHost(reply) {
 }
 
 async function withTempHome(fn) {
-  const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-persona-e2e-'))
+  const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-persona-kit-e2e-'))
   const previous = process.env.DSH_HOME
   process.env.DSH_HOME = home
   try {

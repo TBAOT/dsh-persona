@@ -1,20 +1,20 @@
-# dsh-persona 生成的补丁：不要手改。改完代码后运行：
+# dsh-persona-kit 生成的补丁：不要手改。改完代码后运行：
 #   node scripts/gen-patch.mjs && node scripts/check-patch.mjs
-# 角色是运行时数据（名册 + 记忆/技能目录），不是声明的预设；槽位数 4。
+# 角色是运行时数据（名字 + 记忆/技能目录），不是声明的预设；槽位数 4。
 - insert:
     - id: "persona-memory"
-      name: "dsh-persona"
+      name: "dsh-persona-kit"
       config:
         personaId: "default"
         routeThreshold: 0.9
     - id: "persona-review"
-      name: "dsh-persona/review"
+      name: "dsh-persona-kit/review"
       config:
         personaId: "default"
         routeThreshold: 0.9
     - id: "persona-roster"
-      name: "dsh-persona/roster"
+      name: "dsh-persona-kit/roster"
       config: {}
     - id: "persona-skills"
-      name: "dsh-persona/skills"
+      name: "dsh-persona-kit/skills"
       config: {}

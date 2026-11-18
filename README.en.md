@@ -1,6 +1,6 @@
-# dsh-persona
+# dsh-persona-kit
 
-[![verify](https://github.com/TBAOT/dsh-persona/actions/workflows/verify.yml/badge.svg)](https://github.com/TBAOT/dsh-persona/actions/workflows/verify.yml)
+[![verify](https://github.com/TBAOT/dsh-persona-kit/actions/workflows/verify.yml/badge.svg)](https://github.com/TBAOT/dsh-persona-kit/actions/workflows/verify.yml)
 
 **Memory for DeepSeek Harness, one per persona.** It writes itself, it stays small, and you can
 always see and edit what it holds.
@@ -26,9 +26,9 @@ What it does for you:
 
 ```sh
 # 1. install
-dsh plugin --profile <profile> add github:TBAOT/dsh-persona
+dsh plugin --profile <profile> add github:TBAOT/dsh-persona-kit
 
-# 2. add dsh-persona to the profile's dsh.profile.bundles, then restart the Harness
+# 2. add dsh-persona-kit to the profile's dsh.profile.bundles, then restart the Harness
 ```
 
 3. Open “角色” in the sidebar → create a persona → bind a workspace to it.
@@ -90,7 +90,7 @@ notes for changes that touch the interfaces this plugin uses.
 
 - [docs/guide.md](docs/guide.md) — tiers, write paths, configuration, limits (the “why”)
 - [CHANGELOG.md](CHANGELOG.md) — what changed in each release
-- [Releases](https://github.com/TBAOT/dsh-persona/releases) — package with docs and screenshots
+- [Releases](https://github.com/TBAOT/dsh-persona-kit/releases) — package with docs and screenshots
 
 ## Privacy
 
@@ -100,13 +100,13 @@ manual editing still works.
 
 ## Security boundary
 
-The panel's HTTP API listens on loopback only and requires an `x-dsh-persona: 1` header — that is
+The panel's HTTP API listens on loopback only and requires an `x-dsh-persona-kit: 1` header — that is
 misclick protection, not authentication. Do not expose the port.
 
 ## Uninstall
 
 ```sh
-dsh plugin --profile <profile> remove dsh-persona
+dsh plugin --profile <profile> remove dsh-persona-kit
 ```
 
 Memory directories are kept; delete `~/.dsh/personas/<persona>` yourself if you want them gone.

@@ -49,7 +49,7 @@ test('a host missing required seams is not compatible', () => {
 })
 
 test('the probe survives to disk for the CLI to read', async () => {
-  const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-persona-compat-'))
+  const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-persona-kit-compat-'))
   const previous = process.env.DSH_HOME
   process.env.DSH_HOME = home
   try {
@@ -89,7 +89,7 @@ test('a failing initialisation is contained, never thrown at the Host', async ()
 })
 
 test('without runtime context the plugin falls back to the user message', async () => {
-  const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-persona-compat-'))
+  const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-persona-kit-compat-'))
   const previous = process.env.DSH_HOME
   process.env.DSH_HOME = home
   try {

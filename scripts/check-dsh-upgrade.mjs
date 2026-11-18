@@ -34,7 +34,7 @@ const SEAMS = [
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
 const tested = arg('tested') ?? pkg?.dsh?.testedAgainst ?? null
 
-const headers = { 'user-agent': 'dsh-persona-upgrade-watch', accept: 'application/vnd.github+json' }
+const headers = { 'user-agent': 'dsh-persona-kit-upgrade-watch', accept: 'application/vnd.github+json' }
 if (TOKEN) headers.authorization = `Bearer ${TOKEN}`
 
 async function api(path) {

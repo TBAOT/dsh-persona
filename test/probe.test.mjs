@@ -27,7 +27,7 @@ test('the probe suite is version 2 and every question is classified', () => {
 })
 
 test('no probe question is quoted inside the topic library', async () => {
-  const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-persona-probe-'))
+  const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-persona-kit-probe-'))
   const previous = process.env.DSH_HOME
   process.env.DSH_HOME = home
   try {
@@ -54,7 +54,7 @@ test('no probe question is quoted inside the topic library', async () => {
 })
 
 test('every expected slug is a real topic of the persona the probe runs against', async () => {
-  const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-persona-probe-'))
+  const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-persona-kit-probe-'))
   const previous = process.env.DSH_HOME
   process.env.DSH_HOME = home
   try {

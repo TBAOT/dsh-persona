@@ -1,6 +1,6 @@
-# dsh-persona
+# dsh-persona-kit
 
-[![verify](https://github.com/TBAOT/dsh-persona/actions/workflows/verify.yml/badge.svg)](https://github.com/TBAOT/dsh-persona/actions/workflows/verify.yml)
+[![verify](https://github.com/TBAOT/dsh-persona-kit/actions/workflows/verify.yml/badge.svg)](https://github.com/TBAOT/dsh-persona-kit/actions/workflows/verify.yml)
 
 给 DeepSeek Harness 的**角色记忆**：每个角色一份，自动写，不乱长，你随时看得见也改得动。
 
@@ -24,9 +24,9 @@
 
 ```sh
 # 1. 安装
-dsh plugin --profile <profile> add github:TBAOT/dsh-persona
+dsh plugin --profile <profile> add github:TBAOT/dsh-persona-kit
 
-# 2. 把 dsh-persona 加进 profile 的 dsh.profile.bundles，然后重启 Harness
+# 2. 把 dsh-persona-kit 加进 profile 的 dsh.profile.bundles，然后重启 Harness
 ```
 
 3. 打开左侧栏「角色」→ 新建角色 → 把工作区绑给它。
@@ -84,7 +84,7 @@ pnpm probe     # 用 14 道真实问题量检索质量（命中率 / 注入字�
 
 - [docs/guide.md](docs/guide.md) —— 原理、配置项、容量规则、已知限制（想弄明白"为什么这样设计"看这份）
 - [CHANGELOG.md](CHANGELOG.md) —— 每个版本改了什么
-- [Releases](https://github.com/TBAOT/dsh-persona/releases) —— 安装包（含文档与截图）
+- [Releases](https://github.com/TBAOT/dsh-persona-kit/releases) —— 安装包（含文档与截图）
 
 ## 从 soul-md 迁移
 
@@ -103,13 +103,13 @@ node scripts/migrate-soul-md.mjs --soul-md <$DSH_HOME/soul-md> --persona <角色
 
 ## 接口的安全边界
 
-面板的 HTTP 接口只监听本机回环，并且要求 `x-dsh-persona: 1` 请求头——这是**防误触**，不是身份认证。
+面板的 HTTP 接口只监听本机回环，并且要求 `x-dsh-persona-kit: 1` 请求头——这是**防误触**，不是身份认证。
 不要把端口暴露到局域网。
 
 ## 卸载
 
 ```sh
-dsh plugin --profile <profile> remove dsh-persona
+dsh plugin --profile <profile> remove dsh-persona-kit
 ```
 
 角色记忆目录不会被删除；不需要了再手动删 `~/.dsh/personas/<角色>`。

@@ -43,7 +43,7 @@ function fakeHost(responseText) {
 }
 
 async function withTempHome(fn) {
-  const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-persona-review-'))
+  const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-persona-kit-review-'))
   const previous = process.env.DSH_HOME
   process.env.DSH_HOME = home
   try {
@@ -207,7 +207,7 @@ test('a nearly full memory asks the model to consolidate instead of adding', asy
     await mkdir(dir, { recursive: true })
     await writeFile(
       path.join(dir, 'memory.md'),
-      `<!-- dsh-persona v1 target=memory -->\n${'x'.repeat(1200)}\n`,
+      `<!-- dsh-persona-kit v1 target=memory -->\n${'x'.repeat(1200)}\n`,
       'utf8',
     )
 
@@ -328,7 +328,7 @@ test('a full resident tier turns a review add into a topic instead of rejecting 
   await withTempHome(async (home) => {
     const dir = path.join(home, 'personas', 'tester', 'memory')
     await mkdir(dir, { recursive: true })
-    await writeFile(path.join(dir, 'memory.md'), `<!-- dsh-persona v1 target=memory -->\n${'规则'.repeat(400)}\n`, 'utf8')
+    await writeFile(path.join(dir, 'memory.md'), `<!-- dsh-persona-kit v1 target=memory -->\n${'规则'.repeat(400)}\n`, 'utf8')
 
     const host = fakeHost([{ text: JSON.stringify({ ops: [{ target: 'memory', action: 'add', content: '一条新规则' }] }), finishKind: 'stop' }])
     apply(host.ctx, { personaId: 'tester', routeThreshold: 0.01 })
@@ -370,7 +370,7 @@ test('a tight tier is rewritten by the background pass, not by the chat turn', a
     // Fill the tier past 90% (2 × 48 chars + separators > 90).
     const dir = path.join(home, 'personas', 'tester', 'memory')
     await mkdir(dir, { recursive: true })
-    await writeFile(path.join(dir, 'memory.md'), `<!-- dsh-persona v1 target=memory -->\n${'甲'.repeat(48)}\n§\n${'乙'.repeat(48)}\n`, 'utf8')
+    await writeFile(path.join(dir, 'memory.md'), `<!-- dsh-persona-kit v1 target=memory -->\n${'甲'.repeat(48)}\n§\n${'乙'.repeat(48)}\n`, 'utf8')
 
     await feedTurn(host)
     await emit(host.listeners, 'agent/turn-stopping', { agent: { id: 'session-1' }, turn: 4 })
@@ -400,7 +400,7 @@ test('a read-only tier is skipped by the reviewer, and says so in the log', asyn
     const dir = path.join(home, 'personas', 'tester', 'memory')
     await mkdir(dir, { recursive: true })
     await writeFile(path.join(dir, 'policy.json'), JSON.stringify({ version: 1, readOnly: ['memory'] }), 'utf8')
-    await writeFile(path.join(dir, 'memory.md'), '<!-- dsh-persona v1 target=memory -->\n原有条目\n', 'utf8')
+    await writeFile(path.join(dir, 'memory.md'), '<!-- dsh-persona-kit v1 target=memory -->\n原有条目\n', 'utf8')
 
     await feedTurn(host)
     await emit(host.listeners, 'agent/turn-stopping', { agent: { id: 'session-1' }, turn: 6 })

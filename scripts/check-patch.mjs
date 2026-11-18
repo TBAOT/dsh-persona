@@ -36,10 +36,10 @@ const rows = doc?.[0]?.insert
 if (!Array.isArray(rows)) fail('第一项必须带 insert 列表')
 
 const expected = {
-  'persona-memory': 'dsh-persona',
-  'persona-review': 'dsh-persona/review',
-  'persona-roster': 'dsh-persona/roster',
-  'persona-skills': 'dsh-persona/skills',
+  'persona-memory': 'dsh-persona-kit',
+  'persona-review': 'dsh-persona-kit/review',
+  'persona-roster': 'dsh-persona-kit/roster',
+  'persona-skills': 'dsh-persona-kit/skills',
 }
 
 for (const [id, name] of Object.entries(expected)) {

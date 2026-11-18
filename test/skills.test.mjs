@@ -20,7 +20,7 @@ test('text without frontmatter is left alone', () => {
 })
 
 async function withTempHome(fn) {
-  const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-persona-skills-'))
+  const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-persona-kit-skills-'))
   const previous = process.env.DSH_HOME
   process.env.DSH_HOME = home
   try {

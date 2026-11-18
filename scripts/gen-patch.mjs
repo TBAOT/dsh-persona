@@ -15,17 +15,19 @@ import { SLOT_COUNT } from '../lib/slots.js'
 const here = path.dirname(fileURLToPath(import.meta.url))
 const target = path.join(here, '..', 'cordis.patch.yml')
 
+const PACKAGE = 'dsh-persona-kit'
+
 const rows = [
-  { id: 'persona-memory', name: 'dsh-persona', config: { personaId: 'default', routeThreshold: 0.9 } },
-  { id: 'persona-review', name: 'dsh-persona/review', config: { personaId: 'default', routeThreshold: 0.9 } },
-  { id: 'persona-roster', name: 'dsh-persona/roster', config: {} },
-  { id: 'persona-skills', name: 'dsh-persona/skills', config: {} },
+  { id: 'persona-memory', name: PACKAGE, config: { personaId: 'default', routeThreshold: 0.9 } },
+  { id: 'persona-review', name: `${PACKAGE}/review`, config: { personaId: 'default', routeThreshold: 0.9 } },
+  { id: 'persona-roster', name: `${PACKAGE}/roster`, config: {} },
+  { id: 'persona-skills', name: `${PACKAGE}/skills`, config: {} },
 ]
 
 const header = [
-  '# dsh-persona 生成的补丁：不要手改。改完代码后运行：',
+  `# ${PACKAGE} 生成的补丁：不要手改。改完代码后运行：`,
   '#   node scripts/gen-patch.mjs && node scripts/check-patch.mjs',
-  `# 角色是运行时数据（名册 + 记忆/技能目录），不是声明的预设；槽位数 ${SLOT_COUNT}。`,
+  `# 角色是运行时数据（名字 + 记忆/技能目录），不是声明的预设；槽位数 ${SLOT_COUNT}。`,
   '',
 ].join('\n')
 
@@ -41,5 +43,6 @@ const emitRow = (row) => {
   return lines.join('\n')
 }
 
-await writeFile(target, `${header}- insert:\n${rows.map(emitRow).join('\n')}\n`, 'utf8')
-console.log(`已生成 ${target}（${rows.length} 行）`)
+const body = `${header}- insert:\n${rows.map(emitRow).join('\n')}\n`
+await writeFile(target, body, 'utf8')
+console.log(`已生成 ${path.relative(process.cwd(), target)}：${rows.length} 行服务行`)

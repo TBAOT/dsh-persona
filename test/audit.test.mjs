@@ -8,7 +8,7 @@ import { writeTopic, writeTopicManifest } from '../lib/topics.js'
 import { refreshMeta, writeEntries } from '../lib/store.js'
 
 async function withTempHome(fn) {
-  const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-persona-audit-'))
+  const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-persona-kit-audit-'))
   const previous = process.env.DSH_HOME
   process.env.DSH_HOME = home
   try {

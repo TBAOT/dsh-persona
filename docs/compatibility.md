@@ -23,5 +23,5 @@
 
 ## 数据格式版本
 
-记忆文件首行是 `<!-- dsh-persona v1 target=... -->`。格式变更时依靠这一行做迁移；
+记忆文件首行是 `<!-- dsh-persona-kit v1 target=... -->`。格式变更时依靠这一行做迁移；
 升级前建议备份 `<DSH_HOME>/personas/`。

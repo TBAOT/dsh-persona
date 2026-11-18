@@ -20,13 +20,13 @@ import {
 test('parse and format round-trip', () => {
   const entries = ['第一件事\n第二行', '第二件事']
   const text = formatEntries('memory', entries)
-  assert.match(text, /^<!-- dsh-persona v1 target=memory -->/)
+  assert.match(text, /^<!-- dsh-persona-kit v1 target=memory -->/)
   assert.deepEqual(parseEntries(text), entries)
 })
 
 test('empty file parses to no entries', () => {
   assert.deepEqual(parseEntries(''), [])
-  assert.deepEqual(parseEntries('<!-- dsh-persona v1 target=user -->\n'), [])
+  assert.deepEqual(parseEntries('<!-- dsh-persona-kit v1 target=user -->\n'), [])
 })
 
 test('add rejects exact duplicate', () => {

@@ -1,4 +1,4 @@
-# dsh-persona 原理与使用手册
+# dsh-persona-kit 原理与使用手册
 
 一页讲清：它怎么记住东西、提示词里出现什么、写进去会发生什么、满了怎么办、出问题看哪里。
 
@@ -169,7 +169,7 @@ operations: [{ action: add | patch | remove, content, old_text }]
 
 ```powershell
 pnpm health   # 末尾一行：宿主兼容：插件 0.11.11 · 必需接口齐全 · 召回走 runtime-context
-curl -H "x-dsh-persona: 1" "http://127.0.0.1:<port>/dsh-persona/api/health?id=slot-1"   # 字段 compat
+curl -H "x-dsh-persona-kit: 1" "http://127.0.0.1:<port>/dsh-persona-kit/api/health?id=slot-1"   # 字段 compat
 ```
 
 | 探测项 | 必需 | 缺了会怎样 |

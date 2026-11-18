@@ -46,7 +46,7 @@ function fakeHost() {
 }
 
 async function withTempHome(fn) {
-  const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-persona-'))
+  const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-persona-kit-'))
   const previous = process.env.DSH_HOME
   process.env.DSH_HOME = home
   try {
@@ -88,7 +88,7 @@ test('writes entries to the persona directory and reports usage', async () => {
     assert.equal(result.ok, true)
     const file = path.join(home, 'personas', 'tester', 'memory', 'user.md')
     const text = await readFile(file, 'utf8')
-    assert.match(text, /^<!-- dsh-persona v1 target=user -->/)
+    assert.match(text, /^<!-- dsh-persona-kit v1 target=user -->/)
     assert.match(text, /偏好简洁回答/)
   })
 })

@@ -1,5 +1,5 @@
 /**
- * 把 soul-md 的卡片与记忆搬进 dsh-persona 的结构。
+ * 把 soul-md 的卡片与记忆搬进 dsh-persona-kit 的结构。
  *
  * 用法：
  *   node scripts/migrate-soul-md.mjs --patch <profile/cordis.patch.yml> --persona slot-1
