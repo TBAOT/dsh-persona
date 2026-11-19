@@ -68,7 +68,7 @@
         "@deepseek-ai/dsh-client-ui-layout"
       ]
     },
-    "testedAgainst": "0.2.2-rc.1"
+    "testedAgainst": "0.2.2-rc.3"
   },
   "devDependencies": {
     "yaml": "^2.9.1"
