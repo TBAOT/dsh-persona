@@ -43,7 +43,8 @@
     "verify": "node --test && node scripts/check-patch.mjs",
     "audit": "node scripts/audit.mjs",
     "split-resident": "node scripts/split-resident.mjs",
-    "dsh-upgrade": "node scripts/check-dsh-upgrade.mjs"
+    "dsh-upgrade": "node scripts/check-dsh-upgrade.mjs",
+    "release": "node scripts/release.mjs"
   },
   "engines": {
     "dsh": ">=0.2.2-rc.1",
