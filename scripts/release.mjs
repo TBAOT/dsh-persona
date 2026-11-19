@@ -50,6 +50,13 @@ function main() {
     }
     return execFileSync(command, argv, { cwd: repo, encoding: 'utf8', stdio: 'inherit' })
   }
+  const runShell = (line) => {
+    if (dryRun) {
+      console.log(`  [dry-run] ${line}`)
+      return ''
+    }
+    return execFileSync(line, { cwd: repo, encoding: 'utf8', stdio: 'inherit', shell: true })
+  }
 
   const pkgFile = path.join(repo, 'package.json')
   const pkg = JSON.parse(readFileSync(pkgFile, 'utf8'))
@@ -99,7 +106,8 @@ function main() {
   }
 
   const outDir = path.join(os.tmpdir(), 'dsh-persona-release')
-  run('pnpm', ['pack', '--pack-destination', outDir])
+  // pnpm 在 Windows 上是 .cmd 垫片，execFile 直接调会 ENOENT；走 shell 最稳。
+  runShell(`pnpm pack --pack-destination "${outDir}"`)
   const tarball = path.join(outDir, `dsh-persona-kit-${version}.tgz`)
   if (!dryRun && !existsSync(tarball)) {
     console.error(`找不到打包产物：${tarball}`)
