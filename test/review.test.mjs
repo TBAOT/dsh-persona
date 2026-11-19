@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
@@ -99,6 +100,60 @@ test('a turn produces memory edits through the model', async () => {
     const log = await readFile(path.join(home, 'personas', 'tester', 'review', 'log.jsonl'), 'utf8')
     assert.match(log, /"ok":true/)
     assert.match(log, /"applied"/)
+  })
+})
+
+test('the workspace decides which persona gets the turn, and the log says so', async () => {
+  await withTempHome(async (home) => {
+    const workspace = path.join(home, 'proj')
+    await mkdir(workspace, { recursive: true })
+    await mkdir(path.join(home, 'personas'), { recursive: true })
+    await writeFile(
+      path.join(home, 'personas', 'index.json'),
+      JSON.stringify({ version: 1, personas: [{ id: '甲', name: '甲', workspaces: [workspace] }] }),
+      'utf8',
+    )
+
+    const reply = JSON.stringify({ ops: [{ target: 'memory', action: 'add', content: '项目用 pnpm' }] })
+    const host = fakeHost(reply)
+    apply(host.ctx, { personaId: 'default' })
+    await emit(host.listeners, 'session/event', { id: 'session-cwd' }, {
+      type: 'user/message',
+      message: { content: [{ type: 'text', text: '以后别用 npm，用 pnpm' }] },
+    })
+    await emit(host.listeners, 'agent/turn-stopping', {
+      agent: { id: 'session-cwd', session: { header: { cwd: path.join(workspace, 'src') } } },
+      turn: 1,
+    })
+    await tick()
+
+    const text = await readFile(path.join(home, 'personas', '甲', 'memory', 'memory.md'), 'utf8')
+    assert.match(text, /项目用 pnpm/)
+    const log = await readFile(path.join(home, 'personas', '甲', 'review', 'log.jsonl'), 'utf8')
+    assert.match(log, /"via":"cwd"/)
+    assert.match(log, /"persona":"甲"/)
+    assert.equal(existsSync(path.join(home, 'personas', 'default', 'memory', 'memory.md')), false)
+  })
+})
+
+test('an unbound workspace goes to the pool, and the log records why', async () => {
+  await withTempHome(async (home) => {
+    const reply = JSON.stringify({ ops: [{ target: 'memory', action: 'add', content: '这条属于未认领池' }] })
+    const host = fakeHost(reply)
+    apply(host.ctx, { personaId: 'default' })
+    await emit(host.listeners, 'session/event', { id: 'session-pool' }, {
+      type: 'user/message',
+      message: { content: [{ type: 'text', text: '随便聊聊' }] },
+    })
+    await emit(host.listeners, 'agent/turn-stopping', {
+      agent: { id: 'session-pool', session: { header: { cwd: path.join(home, 'nowhere') } } },
+      turn: 1,
+    })
+    await tick()
+
+    const log = await readFile(path.join(home, 'personas', 'default', 'review', 'log.jsonl'), 'utf8')
+    assert.match(log, /"via":"pool"/)
+    assert.match(log, /"persona":"default"/)
   })
 })
 
