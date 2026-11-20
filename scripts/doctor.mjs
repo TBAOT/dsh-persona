@@ -5,6 +5,7 @@
  * a broken `link:` dependency) stop the app from starting, and their only symptom is
  * "the app won't open".
  */
+import { execFileSync } from 'node:child_process'
 import os from 'node:os'
 import path from 'node:path'
 import { inspectProfile } from '../lib/doctor.js'
@@ -22,7 +23,16 @@ console.log(`profile: ${profileDir}`)
 console.log(`DSH（按 profile 依赖推断）: ${dshVersion ?? '未知'}`)
 console.log(`补丁条目: ${entries.length} 个`)
 console.log(`插件: ${compat ? `${compat.package ?? '?'} · ${compat.ok ? '接缝齐全' : `缺 ${(compat.missing ?? []).join('、')}`}` : '（还没探测结果）'}`)
+if (compat?.applyMs != null) console.log(`插件初始化耗时: ${compat.applyMs} ms`)
 if (compat?.lastError) console.log(`上次插件初始化失败: ${compat.lastError}`)
+
+// 一个失效的本地代理会让 push 全部失败，但 gh 仍然能用——先看一眼省的排查半天
+try {
+  const proxy = execFileSync('git', ['config', '--get', 'http.proxy'], { encoding: 'utf8' }).trim()
+  if (proxy) console.log(`git 代理: ${proxy}（失效时 push 会失败，gh 不受影响）`)
+} catch {
+  /* 没配代理是正常的 */
+}
 
 if (!problems.length) {
   console.log('\n没有问题：补丁条目符合 Loader 校验规则，link 依赖也能解析。')

@@ -57,6 +57,26 @@ function main() {
     }
     return execFileSync(line, { cwd: repo, encoding: 'utf8', stdio: 'inherit', shell: true })
   }
+  // A stale local proxy in git config (`http://127.0.0.1:10808` after the VPN dies) makes
+  // every push fail while `gh` still works. Retry once with proxies disabled, then say
+  // plainly what is left to do.
+  const push = (argv) => {
+    try {
+      run(argv[0], argv.slice(1))
+      return true
+    } catch {
+      console.log('  push 失败，改用 --no-proxy 重试（git 里可能配着已失效的本地代理）')
+      try {
+        run(argv[0], ['-c', 'http.proxy=', '-c', 'https.proxy=', ...argv.slice(1)])
+        return true
+      } catch {
+        console.error(`\n本地已完成：commit 与 tag v${version} 都在。推送没成功，恢复命令：`)
+        console.error(`  git -c http.proxy= push origin HEAD && git -c http.proxy= push origin v${version} --force`)
+        console.error(`  gh release create v${version} --repo TBAOT/dsh-persona-kit --title "${title}" --notes-file "${notes ?? 'notes.md'}" <tgz>`)
+        process.exit(1)
+      }
+    }
+  }
 
   const pkgFile = path.join(repo, 'package.json')
   const pkg = JSON.parse(readFileSync(pkgFile, 'utf8'))
@@ -101,8 +121,8 @@ function main() {
   if (noPush) {
     console.log('  --no-push：commit 与 tag 只留在本地')
   } else {
-    run('git', ['push', 'origin', 'HEAD'])
-    run('git', ['push', 'origin', `v${version}`, '--force'])
+    push(['git', 'push', 'origin', 'HEAD'])
+    push(['git', 'push', 'origin', `v${version}`, '--force'])
   }
 
   const outDir = path.join(os.tmpdir(), 'dsh-persona-release')

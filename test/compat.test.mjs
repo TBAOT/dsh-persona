@@ -71,6 +71,11 @@ test('the probe survives to disk for the CLI to read', async () => {
 test('a failing initialisation is contained, never thrown at the Host', async () => {
   // A Host that renamed `tools.register` would make the plugin throw while activating;
   // an exception there can keep DSH from starting. apply() must swallow it instead.
+  // Isolate DSH_HOME: recordApply() persists the failure, and a test must never leave
+  // "lastError" behind in the real ~/.dsh/storages/persona-compat.json.
+  const home = await mkdtemp(path.join(os.tmpdir(), 'dsh-persona-compat-'))
+  const previous = process.env.DSH_HOME
+  process.env.DSH_HOME = home
   const ctx = {
     logger: { warn() {}, info() {} },
     on: () => () => {},
@@ -81,11 +86,19 @@ test('a failing initialisation is contained, never thrown at the Host', async ()
     systemPrompt: { section: () => () => {}, context: () => () => {} },
   }
   let result
-  assert.doesNotThrow(() => {
-    result = applyMemory(ctx, { personaId: 'tester' })
-  })
-  assert.equal(result.disabled, true)
-  assert.match(result.error, /boom/)
+  try {
+    assert.doesNotThrow(() => {
+      result = applyMemory(ctx, { personaId: 'tester' })
+    })
+    assert.equal(result.disabled, true)
+    assert.match(result.error, /boom/)
+    const recorded = readCompatSync()
+    assert.equal(recorded?.lastError, 'boom: tools seam changed', '失败原因必须落盘，否则"应用起来了但记忆没了"无从追')
+  } finally {
+    if (previous === undefined) delete process.env.DSH_HOME
+    else process.env.DSH_HOME = previous
+    await rm(home, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 })
+  }
 })
 
 test('without runtime context the plugin falls back to the user message', async () => {
