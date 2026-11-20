@@ -1,5 +1,17 @@
 # 变更日志
 
+## 0.14.0
+
+让"升级后应用打不开"变成可预检、可追溯。
+
+- **`pnpm doctor`**：按 rc.3 起 Loader 的校验规则检查 profile 的 `cordis.patch.yml`
+  （`name` 字符串、`group` 布尔、`disabled` 布尔或 `!!js`、`group: true` 必带 `config` 列表、
+  `inject` 列表/映射、`isolate` 映射），并检查 `link:` 依赖是否指向真实包、是否已装进 `node_modules`。
+  这类问题会在插件加载之前终止启动，插件自己兜不住，只能事先查。
+- **compat 记录初始化结果**：`persona-compat.json` 新增 `applyMs`、`lastError`、`nodeVersion`；
+  插件若在 `apply()` 里失败并自我停用，失败原因会留在磁盘上，`pnpm doctor` 会显示。
+- 测试 160 项（doctor 7 条：合规样例、六条规则、`!!js`、link 依赖、版本推断、整体检查）。
+
 ## 0.13.4
 
 记忆不再写错角色。

@@ -131,6 +131,7 @@ operations: [{ action: add | patch | remove, content, old_text }]
 | `pnpm health` | 每个角色最近 5 轮的注入次数、outcome 分布、tokens；verdict：`ok`/`broken`/`silent`/`unverified`/`stale` |
 | `pnpm audit` | 记忆库结构：空摘要、超限、近似重复主题、档内/跨档重复、meta 漂移（这些算错误），缺别名/超长/接近上限只提醒 |
 | `pnpm probe` | 检索质量：14 道真实题，按题型报命中率 / 平均注入字符 / 平均耗时；`--split=tune|verify` |
+| `pnpm doctor` | **升级前**检查 profile：补丁条目是否符合新版 Loader 校验、`link:` 依赖能否解析。这类问题会让应用直接起不来，且不留日志 |
 | `GET /health?id=` | 面板页脚那一格的数据源（含 `readout.label/title/tone`） |
 | 面板页脚 | `召回 3 篇 / 171 字符`，悬停看 outcome、耗时、注入了哪几篇 |
 | `review/metrics.jsonl` | 每轮一行：`recall{outcome,chars,topics,ms}`、`tokens{in,out,cacheRead}`、`usageMissing`、`blocked`、`redirected` |
